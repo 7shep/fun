@@ -1,0 +1,1 @@
+{"name":"last-call-live","private":true,"type":"module","scripts":{"test":"node --test"}}

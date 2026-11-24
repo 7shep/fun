@@ -1,0 +1,1610 @@
+/* ==========================================================================
+   LAST CALL LIVE! - styles.css
+   Phone-first, vanilla CSS. 1970s-80s TV game show look: deep red, gold,
+   teal, wood panels, marquee bulbs, chunky condensed display type.
+   Fonts are loaded by index.html (Google Fonts: Anton, Bungee).
+   Class names are a contract with index.html / app.js. Do not rename.
+   ========================================================================== */
+
+
+/* ---------- 1. Tokens ---------------------------------------------------- */
+:root {
+  --red: #8e1b1b;
+  --red-hi: #c42d2d;
+  --red-dk: #5a0d0d;
+  --gold: #f2c14e;
+  --gold-hi: #ffe08a;
+  --gold-dk: #9c6f1c;
+  --teal: #1a7f7a;
+  --teal-hi: #2fb3ac;
+  --teal-dk: #0c4846;
+  --wood: #7a4a24;
+  --wood-dk: #4a2a12;
+  --ink: #2a1608;
+  --cream: #fff3d6;
+  --parch: #f4e6c4;
+  --good: #3fae62;
+  --bad: #e0433a;
+  --grey: #6e6862;
+  --bulb: #fff3b0;
+
+  --display: 'Bungee', 'Anton', Impact, sans-serif;
+  --condensed: 'Anton', Impact, 'Arial Narrow', sans-serif;
+  --body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --serif: Georgia, 'Times New Roman', serif;
+  --script: 'Brush Script MT', cursive;
+}
+
+
+/* ---------- 2. Keyframes (shared) --------------------------------------- */
+@keyframes screenIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes bulbA {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+@keyframes bulbB {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 1; }
+}
+@keyframes flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+  20%, 24%, 55% { opacity: 0.4; }
+}
+@keyframes logoGlow {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.15); }
+}
+@keyframes lightsBlink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+@keyframes raysSpin {
+  to { transform: rotate(360deg); }
+}
+@keyframes zoomBounce {
+  0%   { opacity: 0; transform: scale(0.3); }
+  60%  { opacity: 1; transform: scale(1.12); }
+  80%  { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+@keyframes confettiFall {
+  from { background-position: 0 0, 0 0, 0 0; }
+  to   { background-position: 0 640px, 30px 720px, 0 840px; }
+}
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(3px); }
+}
+@keyframes cardFlip {
+  from { opacity: 0; transform: perspective(400px) rotateY(90deg); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: none; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes busFlash {
+  0%, 49% {
+    color: var(--red-hi);
+    text-shadow: 0 0 10px var(--red-hi), 0 0 2px #fff;
+  }
+  50%, 100% {
+    color: var(--gold-hi);
+    text-shadow: 0 0 14px var(--gold), 0 0 2px #fff;
+  }
+}
+@keyframes bannerSlide {
+  from { opacity: 0; transform: translateX(-30%); }
+  to   { opacity: 1; transform: none; }
+}
+
+
+/* ---------- 3. Base / page ---------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  max-width: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  max-width: 100%;
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--cream);
+  overflow-wrap: anywhere;
+  -webkit-font-smoothing: antialiased;
+  /* Sparkle dots + faint starburst rays over a wine-to-brown spotlight. CSS only. */
+  background:
+    radial-gradient(circle, rgba(255, 240, 190, 0.32) 1px, transparent 1.6px) 0 0 / 37px 41px,
+    repeating-conic-gradient(from 0deg at 50% 0%, rgba(255, 224, 138, 0.05) 0deg 3deg, transparent 3deg 14deg),
+    radial-gradient(ellipse at 50% 0%, #5a1616 0%, #2a0b0c 55%, #140506 100%);
+}
+
+/* Phone frame: centred column, room for the fixed topbar (52px) plus a gap. */
+#app {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 66px 12px 28px;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.hidden {
+  display: none !important;
+}
+
+
+/* ---------- 4. Layout helpers ------------------------------------------- */
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  animation: screenIn 0.35s ease-out both;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  min-width: 0;
+}
+.grid2 > * {
+  min-width: 0;
+}
+
+.center {
+  text-align: center;
+}
+
+.muted {
+  opacity: 0.7;
+  font-size: 0.9em;
+}
+
+.small {
+  font-size: 13px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+
+/* ---------- 5. Topbar --------------------------------------------------- */
+/* Wood-panel bar, fixed. Stripes run along the lower edge as a trim. */
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 800;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.14) 0 2px, transparent 2px 22px),
+    linear-gradient(180deg, #9a6230 0%, var(--wood) 55%, var(--wood-dk) 100%);
+  border-bottom: 3px solid var(--gold);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -9px;
+  height: 6px;
+  pointer-events: none;
+  background: repeating-linear-gradient(90deg,
+    var(--red) 0 16px, var(--gold) 16px 22px,
+    var(--teal) 22px 38px, var(--gold) 38px 44px);
+}
+
+.brand {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--display);
+  font-size: 15px;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gold-hi);
+  text-shadow: 2px 2px 0 var(--red-dk), 0 0 10px rgba(242, 193, 78, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Round 44x44 gold-ringed button used for topbar actions. */
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  border: 3px solid var(--gold);
+  background: radial-gradient(circle at 40% 35%, var(--wood) 0%, var(--wood-dk) 100%);
+  color: var(--gold);
+  font-family: var(--display);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--wood-dk), inset 0 0 0 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.08s, box-shadow 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.icon-btn:active {
+  transform: scale(0.92) translateY(2px);
+  box-shadow: 0 1px 0 var(--wood-dk), inset 0 0 0 2px rgba(0, 0, 0, 0.25);
+}
+.icon-btn:focus-visible {
+  outline: 3px solid var(--cream);
+  outline-offset: 2px;
+}
+.icon-btn.on {
+  background: radial-gradient(circle at 40% 35%, #fff3b0 0%, var(--gold) 70%);
+  color: var(--ink);
+  box-shadow: 0 0 14px var(--gold), 0 3px 0 var(--gold-dk);
+}
+.icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+
+/* ---------- 6. Bulb lights (decorative rows and marquee borders) -------- */
+/* Row of blinking bulbs for headers. Pure CSS dots. */
+.lights {
+  width: 100%;
+  height: 14px;
+  margin: 0 0 8px;
+  background:
+    radial-gradient(circle, var(--bulb) 0 3px, var(--gold) 3.5px 4.5px, transparent 5px)
+    0 50% / 18px 14px repeat-x;
+  animation: lightsBlink 1s steps(2, end) infinite;
+}
+
+
+/* ---------- 7. Marquee and panels --------------------------------------- */
+/* Marquee: red gradient panel, gold border, bulb ring outside the edge.
+   The bulb ring is ::before (bright) and ::after (offset, dim) so they
+   chase. Both are masked so only the ring 16px outside the panel shows. */
+.marquee {
+  position: relative;
+  isolation: isolate;
+  margin: 18px 8px;
+  min-width: 0;
+  padding: 18px 14px;
+  border-radius: 20px;
+  color: var(--cream);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 224, 138, 0.25), transparent 55%),
+    linear-gradient(180deg, var(--red-hi) 0%, var(--red) 55%, var(--red-dk) 100%);
+  border: 3px solid var(--gold);
+  box-shadow:
+    inset 0 0 0 2px var(--red-dk),
+    inset 0 -10px 0 rgba(0, 0, 0, 0.2),
+    0 8px 0 var(--red-dk),
+    0 14px 26px rgba(0, 0, 0, 0.55);
+}
+.marquee::before,
+.marquee::after {
+  content: "";
+  position: absolute;
+  inset: -16px;
+  padding: 16px;
+  border-radius: 36px;
+  pointer-events: none;
+  background: radial-gradient(circle, var(--bulb) 0 3px, #ffb347 4px 5px, transparent 6px) 0 0 / 22px 22px;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+  animation: bulbA 1.2s ease-in-out infinite;
+}
+.marquee::after {
+  background-position: 11px 11px;
+  animation-name: bulbB;
+}
+
+/* Teal variant: same bulbs, teal fill. */
+.marquee.teal {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.18), transparent 55%),
+    linear-gradient(180deg, var(--teal-hi) 0%, var(--teal) 55%, var(--teal-dk) 100%);
+  box-shadow:
+    inset 0 0 0 2px var(--teal-dk),
+    inset 0 -10px 0 rgba(0, 0, 0, 0.2),
+    0 8px 0 var(--teal-dk),
+    0 14px 26px rgba(0, 0, 0, 0.55);
+}
+
+/* Plain dense card for content (no bulbs). */
+.panel {
+  min-width: 0;
+  padding: 14px;
+  border-radius: 14px;
+  color: var(--cream);
+  background: linear-gradient(180deg, #3a1414 0%, #1f0909 100%);
+  border: 2px solid rgba(242, 193, 78, 0.35);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+
+/* ---------- 8. Titles and text ------------------------------------------ */
+/* Big stacked title on the home screen. Use <span> per line. */
+.logo {
+  margin: 8px auto 4px;
+  max-width: 100%;
+  font-family: var(--display);
+  font-size: clamp(36px, 11.5vw, 66px);
+  line-height: 0.92;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--gold);
+  text-shadow:
+    0 3px 0 var(--red-dk),
+    0 6px 0 var(--red),
+    0 9px 0 #3a0808,
+    3px 9px 0 var(--teal-dk),
+    0 0 22px rgba(242, 193, 78, 0.55);
+  transform: rotate(-3deg);
+  animation: logoGlow 3.2s ease-in-out infinite;
+}
+.logo span {
+  display: block;
+}
+
+h1.title {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--gold);
+  text-shadow: 0 3px 0 var(--red-dk), 0 0 14px rgba(242, 193, 78, 0.4);
+}
+
+h2.subtitle {
+  margin: 0;
+  font-family: var(--condensed);
+  font-weight: 400;
+  font-size: 22px;
+  line-height: 1.15;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--cream);
+}
+
+p.lead {
+  margin: 0;
+  font-size: 17px;
+  text-align: center;
+  color: rgba(255, 243, 214, 0.92);
+}
+
+
+/* ---------- 9. Buttons -------------------------------------------------- */
+/* Chunky 3D button. Base = wood. The bottom edge is a solid shadow that
+   the button presses down onto on :active. */
+.btn {
+  --face: linear-gradient(180deg, #9a6230 0%, var(--wood) 60%, var(--wood-dk) 100%);
+  --dk: var(--wood-dk);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  min-width: 44px;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--face);
+  color: var(--cream);
+  font-family: var(--display);
+  font-size: 16px;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+  box-shadow: 0 6px 0 var(--dk), 0 10px 16px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: transform 0.08s, box-shadow 0.08s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:active {
+  transform: translateY(6px);
+  box-shadow: 0 0 0 var(--dk), 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+.btn:focus-visible {
+  outline: 3px solid var(--gold-hi);
+  outline-offset: 3px;
+}
+
+.btn.primary {
+  --face: linear-gradient(180deg, var(--gold-hi) 0%, var(--gold) 60%, #d9a23a 100%);
+  --dk: var(--gold-dk);
+  color: var(--ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.btn.secondary {
+  --face: linear-gradient(180deg, var(--teal-hi) 0%, var(--teal) 60%, var(--teal-dk) 100%);
+  --dk: var(--teal-dk);
+}
+
+.btn.danger {
+  --face: linear-gradient(180deg, var(--red-hi) 0%, var(--red) 60%, var(--red-dk) 100%);
+  --dk: var(--red-dk);
+}
+
+/* Ghost: transparent with a gold outline, no 3D edge. */
+.btn.ghost {
+  --face: transparent;
+  background: transparent;
+  color: var(--gold);
+  border: 2px solid var(--gold);
+  box-shadow: none;
+}
+.btn.ghost:active {
+  transform: translateY(2px);
+  background: rgba(242, 193, 78, 0.15);
+  box-shadow: none;
+}
+
+/* Small inline button: auto width, smaller type. */
+.btn.small {
+  width: auto;
+  min-height: 44px;
+  padding: 8px 14px;
+  font-size: 13px;
+  box-shadow: 0 4px 0 var(--dk), 0 6px 10px rgba(0, 0, 0, 0.4);
+}
+.btn.small:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 var(--dk), 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Disabled: greyed, no press effect. Kept last so it wins over variants. */
+.btn:disabled {
+  --face: linear-gradient(180deg, #6a655f 0%, #4d4944 100%);
+  --dk: #2b2825;
+  color: #b7b0a8;
+  text-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 4px 0 var(--dk);
+}
+.btn.ghost:disabled {
+  background: transparent;
+  border-color: #6a655f;
+  color: #8a837b;
+  box-shadow: none;
+}
+.btn:disabled:active {
+  transform: none;
+  box-shadow: 0 4px 0 var(--dk);
+}
+.btn.ghost:disabled:active {
+  background: transparent;
+  box-shadow: none;
+}
+
+
+/* ---------- 10. Form fields --------------------------------------------- */
+.field {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  min-width: 44px;
+  padding: 10px 14px;
+  font-family: var(--body);
+  font-size: 18px;
+  line-height: 1.3;
+  color: var(--ink);
+  background: var(--cream);
+  border: 2px solid var(--gold-dk);
+  border-radius: 12px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  appearance: none;
+  -webkit-appearance: none;
+}
+.field:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+  border-color: var(--gold-hi);
+  box-shadow: 0 0 0 4px rgba(242, 193, 78, 0.35);
+}
+textarea.field {
+  min-height: 120px;
+  resize: vertical;
+}
+select.field {
+  padding-right: 38px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink) 50%),
+    linear-gradient(135deg, var(--ink) 50%, transparent 50%);
+  background-position: calc(100% - 20px) 55%, calc(100% - 14px) 55%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+/* Room-entry code box. */
+.code-input,
+.field.code-input {
+  min-height: 56px;
+  font-family: var(--condensed);
+  font-size: 36px;
+  line-height: 1.2;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+/* Checkbox row: label wraps a big checkbox and text. */
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  color: var(--cream);
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+}
+label.check input[type="checkbox"] {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+label.check > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+label.check:active {
+  background: rgba(255, 243, 214, 0.1);
+}
+label.check:focus-within {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+
+/* ---------- 11. Room code ----------------------------------------------- */
+.room-code {
+  display: block;
+  padding: 6px 0;
+  text-align: center;
+  font-family: var(--condensed);
+  font-size: clamp(48px, 18vw, 76px);
+  line-height: 1.05;
+  letter-spacing: 0.14em;
+  text-indent: 0.14em;
+  color: var(--gold);
+  text-shadow:
+    0 0 6px rgba(255, 224, 138, 0.8),
+    0 0 18px rgba(242, 193, 78, 0.6),
+    0 3px 0 var(--red-dk);
+  overflow-wrap: anywhere;
+}
+
+
+/* ---------- 12. Player list and badges ---------------------------------- */
+ul.player-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+li.player,
+.player {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  color: var(--cream);
+  font-weight: 600;
+}
+li.player:nth-child(odd) {
+  background: rgba(255, 243, 214, 0.07);
+}
+li.player:nth-child(even) {
+  background: rgba(0, 0, 0, 0.18);
+}
+.player > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-family: var(--body);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: rgba(255, 243, 214, 0.16);
+  color: var(--cream);
+  flex-shrink: 0;
+}
+.badge.host {
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+  color: var(--ink);
+  box-shadow: 0 2px 0 var(--gold-dk);
+}
+.badge.you {
+  background: var(--teal);
+  color: #fff;
+  border: 1px solid var(--teal-hi);
+}
+.badge.off {
+  background: #5b5550;
+  color: #d8d2c8;
+  border: 1px dashed #9a938c;
+}
+.badge.signed {
+  background: var(--good);
+  color: #fff;
+}
+.badge.signed::before {
+  content: "\2713";
+  font-weight: 900;
+}
+
+
+/* ---------- 13. Chips --------------------------------------------------- */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  max-width: 100%;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 2px solid var(--cream);
+  background: rgba(255, 243, 214, 0.08);
+  color: var(--cream);
+  font-family: var(--body);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: transform 0.1s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.chip:active {
+  transform: scale(0.96);
+  background: rgba(255, 243, 214, 0.22);
+}
+.chip:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+.chip.on {
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+  color: var(--ink);
+  border-color: var(--gold-hi);
+  box-shadow: 0 3px 0 var(--gold-dk);
+}
+.chip.on:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--gold-dk);
+}
+
+
+/* ---------- 14. Terms and signatures ------------------------------------ */
+/* Scroll box styled as a parchment legal notice. */
+.terms {
+  position: relative;
+  max-height: 48vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 18px 16px;
+  border-radius: 6px;
+  border: 2px solid #b08a4a;
+  background:
+    radial-gradient(ellipse at 50% 0%, #fff8e6, transparent 70%),
+    var(--parch);
+  box-shadow: inset 0 0 40px rgba(120, 80, 20, 0.25);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.5;
+}
+/* Faint OFFICIAL stamp watermark. Decorative only. */
+.terms::after {
+  content: "OFFICIAL";
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-18deg);
+  padding: 6px 14px;
+  border: 5px double rgba(142, 27, 27, 0.13);
+  color: rgba(142, 27, 27, 0.13);
+  font-family: var(--display);
+  font-size: 40px;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.terms h3 {
+  margin: 0 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #b08a4a;
+  color: var(--red-dk);
+  font-family: var(--serif);
+  font-size: 18px;
+  font-variant: small-caps;
+  letter-spacing: 0.08em;
+}
+.terms p {
+  margin: 0 0 10px;
+  overflow-wrap: anywhere;
+}
+.terms .fine {
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.75;
+}
+
+/* Signed names in a handwriting face, each with a gold underline. */
+.signatures {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-family: var(--script), cursive;
+  font-size: 24px;
+  line-height: 1.2;
+  color: var(--cream);
+}
+.signatures > * {
+  max-width: 100%;
+  padding: 0 4px;
+  border-bottom: 2px solid var(--gold);
+  overflow-wrap: anywhere;
+}
+
+
+/* ---------- 15. Timer --------------------------------------------------- */
+.timer {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 2px solid #000;
+  background: #1a0808;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+/* Width is set inline by app.js (percent). */
+.timer i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gold), #e8832a 60%, var(--red-hi));
+  transition: width 0.5s linear;
+}
+
+.timer-num {
+  display: block;
+  font-family: var(--condensed);
+  font-size: clamp(44px, 15vw, 64px);
+  line-height: 1;
+  text-align: center;
+  color: var(--gold);
+  text-shadow: 0 0 12px rgba(242, 193, 78, 0.6), 0 3px 0 var(--red-dk);
+}
+
+
+/* ---------- 16. Prompts, answers and voting ----------------------------- */
+.prompt {
+  padding: 18px 14px;
+  border-radius: 14px;
+  border: 3px solid var(--gold-dk);
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 22px;
+  line-height: 1.25;
+  text-align: center;
+  box-shadow: 0 6px 0 #b8861e, 0 10px 18px rgba(0, 0, 0, 0.35);
+  overflow-wrap: anywhere;
+}
+
+.answer {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 3px solid transparent;
+  background: var(--cream);
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  box-shadow: 0 4px 0 #b8861e;
+}
+.answer.win {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold), 0 0 24px rgba(242, 193, 78, 0.8);
+  animation: pulseGlow 1.6s ease-in-out infinite;
+}
+.answer.lose {
+  opacity: 0.45;
+  filter: grayscale(0.8);
+}
+
+/* Big tappable answer button. */
+.vote-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 72px;
+  min-width: 44px;
+  padding: 12px 16px;
+  border: 3px solid #c9a24a;
+  border-radius: 14px;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: left;
+  overflow-wrap: anywhere;
+  box-shadow: 0 5px 0 #b8861e;
+  cursor: pointer;
+  transition: transform 0.08s, box-shadow 0.08s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.vote-option:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 #b8861e;
+  background: #fff8e6;
+}
+.vote-option:focus-visible {
+  outline: 3px solid var(--gold-hi);
+  outline-offset: 3px;
+}
+.vote-option.on {
+  border-color: var(--gold-hi);
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+  box-shadow: 0 5px 0 var(--gold-dk), 0 0 0 4px var(--teal-hi);
+}
+.vote-option:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Small name pills under an answer. */
+.voters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.voters > * {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(26, 127, 122, 0.85);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+
+/* ---------- 17. Callout (full-screen drink call) ------------------------ */
+/* Hidden unless .show. Rays are a fixed pseudo so they do not add scroll.
+   Children are centred with auto margins so a long list can still scroll
+   from the top. */
+.callout {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  padding: 18px 16px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 224, 138, 0.45) 0%, #6b1212 35%, #2a0606 70%, #100303 100%);
+}
+.callout.show {
+  display: flex;
+}
+.callout::before {
+  content: "";
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 220vmax;
+  height: 220vmax;
+  margin: -110vmax 0 0 -110vmax;
+  pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 224, 138, 0.2) 0deg 6deg, transparent 6deg 18deg);
+  animation: raysSpin 24s linear infinite;
+}
+.callout > * {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  text-align: center;
+}
+.callout > :first-child {
+  margin-top: auto;
+}
+.callout > :last-child {
+  margin-bottom: auto;
+}
+.callout.show > * {
+  animation: zoomBounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.callout-title {
+  display: inline-block;
+  padding: 8px 16px;
+  border: 3px solid var(--gold);
+  border-radius: 10px;
+  background: repeating-linear-gradient(-45deg, var(--red) 0 12px, var(--red-dk) 12px 24px);
+  color: var(--gold-hi);
+  font-family: var(--display);
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  box-shadow: 0 0 18px rgba(242, 193, 78, 0.6);
+}
+
+.callout-line {
+  margin: 10px 0;
+  min-width: 0;
+}
+.callout-name {
+  display: block;
+  font-family: var(--display);
+  font-size: clamp(28px, 9vw, 40px);
+  line-height: 1.1;
+  color: var(--gold);
+  text-transform: uppercase;
+  text-shadow: 0 3px 0 var(--red-dk), 0 0 16px rgba(242, 193, 78, 0.6);
+  overflow-wrap: anywhere;
+}
+.callout-text {
+  display: block;
+  font-family: var(--condensed);
+  font-size: clamp(26px, 8.5vw, 34px);
+  line-height: 1.15;
+  color: var(--cream);
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.callout-sub {
+  display: block;
+  margin-top: 14px;
+  font-size: 16px;
+  color: rgba(255, 243, 214, 0.85);
+  overflow-wrap: anywhere;
+}
+
+
+/* ---------- 18. Celebrate (hole in one) --------------------------------- */
+.celebrate {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  padding: 18px 16px;
+  overflow: hidden;
+  background: radial-gradient(circle, #ffe08a 0%, var(--red) 60%, #2a0606 100%);
+}
+.celebrate.show {
+  display: flex;
+}
+/* Two confetti layers built from radial gradients, falling on loop. */
+.celebrate::before,
+.celebrate::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, var(--gold) 0 3px, transparent 4px),
+    radial-gradient(circle, var(--teal-hi) 0 3px, transparent 4px),
+    radial-gradient(circle, #ffffff 0 2px, transparent 3px);
+  background-size: 44px 80px, 58px 90px, 37px 70px;
+  background-position: 0 0, 20px 10px, 9px 30px;
+  animation: confettiFall 3s linear infinite;
+}
+.celebrate::after {
+  background-size: 52px 66px, 40px 74px, 61px 88px;
+  background-position: 26px 0, 4px 40px, 40px 14px;
+  animation-duration: 4.2s;
+}
+.celebrate > * {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  text-align: center;
+}
+.celebrate > :first-child {
+  margin-top: auto;
+}
+.celebrate > :last-child {
+  margin-bottom: auto;
+}
+.celebrate.show > * {
+  animation: zoomBounce 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.celebrate-text {
+  display: block;
+  font-family: var(--display);
+  font-size: clamp(44px, 14vw, 84px);
+  line-height: 0.95;
+  color: var(--gold-hi);
+  text-transform: uppercase;
+  text-shadow:
+    0 4px 0 var(--red-dk),
+    0 8px 0 #3a0808,
+    3px 10px 0 var(--teal-dk),
+    0 0 26px rgba(255, 224, 138, 0.9);
+  overflow-wrap: anywhere;
+  animation: pulseGlow 1.2s ease-in-out infinite;
+}
+
+
+/* ---------- 19. Sheet (bottom-sheet modal) ------------------------------ */
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: none;
+  justify-content: center;
+  align-items: flex-end;
+  background: rgba(10, 2, 2, 0.7);
+  animation: fadeIn 0.2s ease-out both;
+}
+.sheet.show {
+  display: flex;
+}
+.sheet-body {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  max-height: 85vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  border-radius: 18px 18px 0 0;
+  border-top: 4px solid var(--gold);
+  background: linear-gradient(180deg, #4a1518 0%, #1d0708 100%);
+  color: var(--cream);
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.6);
+  animation: slideUp 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+/* Grab bar. */
+.sheet-body::before {
+  content: "";
+  display: block;
+  width: 48px;
+  height: 5px;
+  margin: 0 auto 12px;
+  border-radius: 3px;
+  background: var(--gold);
+}
+
+
+/* ---------- 20. Leaderboard / tally table ------------------------------- */
+table.board {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  color: var(--cream);
+  font-size: 15px;
+}
+table.board th {
+  padding: 8px 6px;
+  border-bottom: 2px solid var(--gold);
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+table.board td {
+  padding: 10px 6px;
+  border-bottom: 1px solid rgba(242, 193, 78, 0.2);
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+table.board tr:nth-child(even) td {
+  background: rgba(255, 243, 214, 0.05);
+}
+/* The viewer's own row. */
+table.board tr.me td {
+  background: rgba(26, 127, 122, 0.6);
+  color: #fff;
+  font-weight: 700;
+}
+/* Drink rows are red-tinted. */
+table.board tr.drink td {
+  background: rgba(224, 67, 58, 0.25);
+}
+table.board td.num,
+table.board th.num {
+  text-align: right;
+  white-space: nowrap;
+}
+table.board td.num {
+  font-family: var(--condensed);
+  font-size: 22px;
+  letter-spacing: 0.02em;
+}
+
+
+/* ---------- 21. Awards -------------------------------------------------- */
+.awards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  min-width: 0;
+}
+@media (min-width: 400px) {
+  .awards {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Gold trophy-style card. */
+.award {
+  min-width: 0;
+  padding: 14px 12px;
+  border-radius: 14px;
+  border: 3px solid #6b4a10;
+  background: linear-gradient(160deg, var(--gold-hi) 0%, var(--gold) 45%, #b8860b 100%);
+  color: var(--ink);
+  text-align: center;
+  box-shadow: inset 0 0 0 2px #fff3b0, 0 6px 14px rgba(0, 0, 0, 0.4);
+}
+.award-title {
+  display: block;
+  font-family: var(--display);
+  font-size: 13px;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--red-dk);
+  overflow-wrap: anywhere;
+}
+.award-name {
+  display: block;
+  margin: 6px 0 4px;
+  font-family: var(--condensed);
+  font-size: 26px;
+  line-height: 1.05;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.award-why {
+  display: block;
+  font-size: 14px;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+
+
+/* ---------- 22. Playing cards and guess buttons ------------------------- */
+.cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Card face: rank big in the middle, suit sits in the child text. */
+.card {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 92px;
+  border-radius: 8px;
+  border: 1px solid #cbbb97;
+  background: linear-gradient(180deg, #fffdf7 0%, #f1ebdc 100%);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+  color: var(--ink);
+  font-family: var(--condensed);
+  font-size: 30px;
+  line-height: 1;
+  animation: cardFlip 0.5s ease-out both;
+}
+.card.red {
+  color: #b3261e;
+}
+/* Patterned back: red and gold diamonds. */
+.card.back {
+  color: transparent;
+  border: 3px solid var(--gold);
+  background:
+    repeating-linear-gradient(45deg, var(--gold) 0 3px, transparent 3px 9px),
+    repeating-linear-gradient(-45deg, var(--gold) 0 3px, transparent 3px 9px),
+    linear-gradient(135deg, var(--red-hi), var(--red) 60%, var(--red-dk));
+}
+.card.wrong {
+  background: #ffe1dc;
+  border: 3px solid var(--red-hi);
+  animation: cardFlip 0.5s ease-out both, shake 0.45s 0.5s both;
+}
+.card.right {
+  border: 3px solid var(--teal-hi);
+  box-shadow: 0 0 0 3px var(--teal), 0 0 22px rgba(47, 179, 172, 0.9);
+}
+
+/* Big guess button, used in a .grid2. */
+.card-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 52px;
+  min-width: 44px;
+  padding: 10px 8px;
+  border: 3px solid #c9a24a;
+  border-radius: 12px;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--condensed);
+  font-size: 22px;
+  line-height: 1.1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: center;
+  overflow-wrap: anywhere;
+  box-shadow: 0 5px 0 #b8861e;
+  cursor: pointer;
+  transition: transform 0.08s, box-shadow 0.08s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.card-btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 #b8861e;
+  background: #fff8e6;
+}
+.card-btn:focus-visible {
+  outline: 3px solid var(--gold-hi);
+  outline-offset: 3px;
+}
+.card-btn.on {
+  border-color: var(--gold-hi);
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+}
+.card-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+
+/* ---------- 23. Bus stop ------------------------------------------------ */
+/* Bus-sign counter: dark LED panel, letters flash red and gold. */
+.bus-stop {
+  display: block;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 6px solid #2a1a0a;
+  background: #1b0404;
+  box-shadow: inset 0 0 24px rgba(255, 0, 0, 0.3), 0 0 0 3px var(--gold);
+  font-family: var(--display);
+  font-size: clamp(40px, 13vw, 84px);
+  line-height: 1.05;
+  text-align: center;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  animation: busFlash 1s steps(1, end) infinite;
+}
+
+/* Dramatic striped banner above or below the bus sign. */
+.bus-banner {
+  display: block;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 4px solid var(--ink);
+  background: repeating-linear-gradient(-45deg, var(--red) 0 14px, var(--red-hi) 14px 28px);
+  color: var(--cream);
+  font-family: var(--display);
+  font-size: 20px;
+  line-height: 1.2;
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow: 0 2px 0 var(--ink);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5);
+  overflow-wrap: anywhere;
+  animation: bannerSlide 0.5s ease-out both;
+}
+
+
+/* ---------- 24. Wheel --------------------------------------------------- */
+/* Square container. The svg fills it and is rotated by inline transform. */
+.wheel-wrap {
+  position: relative;
+  width: min(86vw, 340px);
+  max-width: 100%;
+  aspect-ratio: 1;
+  margin: 0 auto;
+}
+svg.wheel {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  transition: transform 4.5s cubic-bezier(0.12, 0.6, 0.1, 1);
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
+}
+/* Gold pointer at top centre, pointing down into the wheel. */
+.wheel-pointer {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  z-index: 3;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-left: 14px solid transparent;
+  border-right: 14px solid transparent;
+  border-top: 30px solid var(--gold);
+  filter: drop-shadow(0 3px 0 var(--gold-dk));
+  pointer-events: none;
+}
+
+
+/* ---------- 25. Golf course --------------------------------------------- */
+/* Wood-panel frame. Width is capped so the course fits 64vh tall. */
+.golf-wrap {
+  position: relative;
+  width: min(100%, calc(64vh * 100 / 150 + 16px));
+  margin: 0 auto;
+  padding: 8px;
+  border-radius: 16px;
+  border: 3px solid var(--wood-dk);
+  background:
+    repeating-linear-gradient(90deg, #8a5a2b 0 18px, var(--wood) 18px 20px, #6a3c1a 20px 38px);
+  box-shadow: inset 0 0 0 2px rgba(242, 193, 78, 0.5), 0 8px 18px rgba(0, 0, 0, 0.5);
+}
+.golf-wrap canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 100 / 150;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #2e8b4e, #1f6b3a);
+  touch-action: none;
+}
+
+/* Row above the course: hole name, par, strokes. */
+.golf-hud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.golf-hud > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.golf-hud .chip {
+  min-height: 44px;
+}
+
+
+/* ---------- 26. Toast --------------------------------------------------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 950;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  padding: 12px 18px;
+  border-radius: 12px;
+  border: 2px solid var(--gold);
+  background: var(--ink);
+  color: var(--gold-hi);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(-50%, 16px);
+  transition: opacity 0.25s, transform 0.25s, visibility 0.25s;
+}
+.toast.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+
+
+/* ---------- 27. Banner (status strip) ----------------------------------- */
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 2px solid var(--teal-hi);
+  background: linear-gradient(90deg, var(--teal-dk), var(--teal) 50%, var(--teal-dk));
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  overflow-wrap: anywhere;
+  animation: bannerSlide 0.4s ease-out both;
+}
+.banner.warn {
+  border-color: var(--gold);
+  background: linear-gradient(90deg, var(--red-dk), var(--red-hi) 50%, var(--red-dk));
+  animation: bannerSlide 0.4s ease-out both, flicker 2.4s linear infinite;
+}
+
+
+/* ---------- 28. Applause sign ------------------------------------------- */
+/* Dim boxed sign. .on lights it up. */
+.applause {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 3px solid #4a3a2a;
+  background: #1d1008;
+  color: #4a3a2a;
+  font-family: var(--display);
+  font-size: 20px;
+  letter-spacing: 0.15em;
+  text-align: center;
+  text-indent: 0.15em;
+  overflow-wrap: anywhere;
+  transition: color 0.2s, border-color 0.2s;
+}
+.applause.on {
+  border-color: var(--gold);
+  color: #fff3b0;
+  background: #2a1408;
+  text-shadow: 0 0 6px var(--gold), 0 0 14px #ff9f1c;
+  box-shadow: 0 0 18px rgba(242, 193, 78, 0.6), inset 0 0 12px rgba(242, 193, 78, 0.3);
+  animation: flicker 1.2s linear infinite;
+}
+
+
+/* ---------- 29. Reduced motion ------------------------------------------ */
+/* Everything still works. Animations and transitions are just removed. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
