@@ -14,7 +14,7 @@ const HOST_TIMEOUT = 20000;
 const app = {
   view: 'home', error: '', me: null, state: null, net: null, ready: false, present: new Set(),
   offset: 0, lastHostSeen: 0, lastHb: 0, lastHello: 0, helloWanted: false, joining: null,
-  pending: new Map(), lastActId: 0, lastHtml: '', seenCallout: null, fxKey: '', autoSent: {},
+  pending: new Map(), lastActId: 0, lastHtml: '', seenCallout: null, fxKey: '', autoSent: {}, forceAdopt: false, writeFailAt: 0,
   ui: { sheet: null, read: null, waived: null, promptKind: 'quip', alloc: {} },
 };
 const me = () => app.me?.pid;
@@ -47,7 +47,30 @@ function openNet(code) {
     onPresence: (keys) => { app.present = new Set(keys); render(); },
     onReady: () => { app.ready = true; if (amHost()) broadcastState(); else hello(); },
     onStatus: (st) => { if (st !== 'SUBSCRIBED') app.ready = false; },
+    onPolled: () => {
+      if (app.state && !amHost() && Date.now() - app.lastHostSeen > HOST_TIMEOUT) maybeTakeOver();
+    },
+    onWrite,
   });
+}
+
+// The relay refused or lost the host's own state write.
+function onWrite(r, sent) {
+  const s = app.state;
+  if (!s || sent.code !== s.code || !amHost()) return;
+  if (!r.ok) {
+    if (Date.now() - app.writeFailAt > 10000) toast('Connection trouble: retrying…');
+    app.writeFailAt = Date.now();
+    return;
+  }
+  if (r.applied || !r.room) return;
+  if (s.v <= 1 && s.players.length === 1) return createRoom(app.me.name); // that code is already in use: pick another
+  // someone else became host (or won a tie): drop our copy and take the room's
+  if (r.room.epoch > s.epoch || r.room.hostId !== me()) {
+    app.forceAdopt = true;
+    hello();
+    toast('Another phone took over as host');
+  }
 }
 
 function onMsg(m) {
@@ -73,7 +96,8 @@ function onMsg(m) {
 function adopt(s, at = Date.now(), from = null) {
   const cur = app.state;
   if (s.code !== app.me?.code) return;
-  if (cur && !(s.epoch > cur.epoch || (s.epoch === cur.epoch && s.v > cur.v))) return;
+  if (cur && !app.forceAdopt && !(s.epoch > cur.epoch || (s.epoch === cur.epoch && s.v > cur.v))) return;
+  app.forceAdopt = false;
   app.state = s;
   app.helloWanted = false;
   app.offset = s.hostId === me() ? 0 : (Number(at) || Date.now()) - Date.now();
@@ -103,6 +127,7 @@ function hostApply(pid, a) {
 function act(a) {
   app.lastActId = Math.max(Date.now() * 100, app.lastActId + 1);
   a = { ...a, id: app.lastActId };
+  if (app.state?.phase === 'game') a.at = E.stageKey(app.state); // the host drops it if the moment has passed
   if (amHost()) return hostApply(me(), a);
   app.pending.set(a.id, { a, tries: 1, at: Date.now() });
   send({ t: 'act', pid: me(), a });
@@ -126,7 +151,6 @@ function loop() {
     if (s2 !== s) commit(s2);
     if (now - app.lastHb > 2000) { app.lastHb = now; send({ t: 'hb', hostId: s.hostId, epoch: app.state.epoch, v: app.state.v, at: now }); }
   } else {
-    if (now - app.lastHostSeen > HOST_TIMEOUT) maybeTakeOver();
     if (app.helloWanted && now - app.lastHello > 1500) hello();
   }
   for (const [id, p] of app.pending) {
@@ -160,7 +184,8 @@ function joinRoom(code, name) {
   app.error = '';
   openNet(code);
   render();
-  setTimeout(() => { if (app.joining && !app.state) failJoin(`No game found with code ${code}`); }, 8000);
+  clearTimeout(app.joinTimer);
+  app.joinTimer = setTimeout(() => { if (app.joining && !app.state) failJoin(`No game found with code ${code}`); }, 8000);
 }
 function resume(seat) {
   app.me = seat;
@@ -185,11 +210,10 @@ function leave(msg = '') {
 /* ---------------- effects: callouts, sounds, celebrations ---------------- */
 let calloutTimer, toastTimer, celebrateTimer;
 function effects(s) {
-  const c = s.callout;
-  if (c && c.id !== app.seenCallout) {
-    app.seenCallout = c.id;
-    if (hostNow() - c.at < 8000) showCallout(c);
-  }
+  // a phone can skip versions, so show every drink call it hasn't seen yet, merged into one overlay
+  const fresh = (s.callouts ?? []).filter((c) => c.id > (app.seenCallout ?? 0) && hostNow() - c.at < 8000);
+  if (s.callouts?.length) app.seenCallout = Math.max(app.seenCallout ?? 0, s.callouts.at(-1).id);
+  if (fresh.length) showCallout({ items: fresh.flatMap((c) => c.items), reason: [...new Set(fresh.map((c) => c.reason))].join(' · ') });
   const g = s.g;
   const key = g ? `${s.gameNo}:${g.stage}:${g.mi ?? g.i ?? g.hole ?? ''}:${g.ride?.restarts ?? ''}` : s.phase;
   if (key !== app.fxKey) {
@@ -270,6 +294,10 @@ function render() {
     const focus = document.activeElement?.id;
     root.innerHTML = html;
     app.lastHtml = html;
+    // only play the entrance animation when the screen itself changes, not on every state update
+    const s = app.state, key = `${app.view}|${s?.phase}|${s?.g?.type}|${s?.g?.stage}|${s?.g?.mi ?? s?.g?.i ?? s?.g?.hole}`;
+    if (key === app.screenKey && root.firstElementChild) root.firstElementChild.style.animation = 'none';
+    app.screenKey = key;
     for (const [id, v] of Object.entries(vals)) {
       const el = document.getElementById(id);
       if (!el || !root.contains(el)) continue;
@@ -641,7 +669,7 @@ function updateTimers() {
   });
   // submit typed quip answers just before the buzzer instead of losing them
   const s = app.state, g = s?.g;
-  if (g?.type === 'quip' && g.stage === 'answer' && g.players.includes(me()) && !g.submitted[me()] && g.deadline - now < 1500) {
+  if (g?.type === 'quip' && g.stage === 'answer' && g.players.includes(me()) && !g.submitted[me()] && g.deadline - now < 3000) {
     const key = `${s.gameNo}-${g.round}`;
     if (!app.autoSent[key]) { app.autoSent[key] = true; DO.quipSubmit(); }
   }

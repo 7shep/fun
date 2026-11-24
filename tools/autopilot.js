@@ -5,7 +5,8 @@ export const status = (() => {
   window.autoLog = window.autoLog || [];
   let lastKey = '';
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
-  window.auto = setInterval(() => {
+  window.autoWorker?.terminate();
+  const step = () => {
     const { app, act } = lcl, s = app.state;
     if (!s || !app.me || app.pending.size) return;
     const me = app.me.pid, host = s.hostId === me, g = s.g, now = Date.now() + app.offset;
@@ -56,6 +57,9 @@ export const status = (() => {
       if (g.stage === 'pick') return A({ type: 'wheelPick', target: pick(others) });
       if (g.stage === 'handout') return A({ type: 'wheelHandout', alloc: { [pick(others)]: g.pending.total } });
     }
-  }, 300);
+  };
+  // worker clock: hidden tabs throttle setInterval to ~1/min, workers keep ticking
+  window.autoWorker = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 300)'], { type: 'text/javascript' })));
+  window.autoWorker.onmessage = step;
   return 'autopilot on';
 })();

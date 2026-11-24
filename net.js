@@ -2,7 +2,7 @@
 // Same message shapes as a pub/sub channel: {t:'state'|'hb'|'act'|'err'|'hello'}.
 const POLL_MS = 600;
 
-// handlers: {onMsg(payload), onPresence(pids[]), onReady(), onStatus(status)}
+// handlers: {onMsg(payload), onPresence(pids[]), onReady(), onStatus(status), onPolled(), onWrite(result)}
 export function connect(code, pid, h) {
   let closed = false, inflight = false, last = 0, wantAll = true, ready = false;
   let since = { epoch: 0, v: 0 };
@@ -28,7 +28,8 @@ export function connect(code, pid, h) {
         h.onMsg({ t: 'state', s: room.state, at: room.at, from: room.hostId });
       }
       if (room && room.hostAge != null) h.onMsg({ t: 'hb', hostId: room.hostId, epoch: room.epoch, v: room.v, age: room.hostAge });
-      for (const m of r.msgs) h.onMsg(m);
+      for (const m of r.msgs) { try { h.onMsg(m); } catch (e) { console.warn('bad message', e); } } // one bad message can't starve the rest
+      h.onPolled?.(); // only decide on failover from a fresh view of the room
     } catch {
       // network blip: the next tick retries
     } finally { inflight = false; }
@@ -40,7 +41,15 @@ export function connect(code, pid, h) {
       if (closed) return;
       if (m.t === 'hello') { wantAll = true; last = 0; return; }
       if (m.t === 'hb') return; // liveness comes from polling itself
-      if (m.t === 'state') return post({ op: 'state', s: m.s }).catch(() => {});
+      if (m.t === 'state') {
+        return post({ op: 'state', s: m.s, at: m.at })
+          .then((r) => {
+            // our own write is already local; skip downloading it again
+            if (r.applied && (m.s.epoch > since.epoch || (m.s.epoch === since.epoch && m.s.v > since.v))) since = { epoch: m.s.epoch, v: m.s.v };
+            h.onWrite?.(r, m.s);
+          })
+          .catch(() => h.onWrite?.({ ok: false }, m.s));
+      }
       return post({ op: 'msg', to: m.to ?? null, payload: m }).catch(() => {});
     },
     close() { closed = true; },

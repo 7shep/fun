@@ -27,7 +27,7 @@ export function newRoom(code, pid, name) {
   return {
     code, epoch: 1, v: 1, seq: 0, hostId: pid, players: [{ id: pid, name }],
     difficulty: 'fun', game: 'quip', laps: 1, phase: 'lobby', terms: null, g: null, gameNo: 0,
-    results: null, drinks: [], callout: null, custom: [], history: [], lastAct: {},
+    results: null, drinks: [], callouts: [], custom: [], history: [], lastAct: {},
   };
 }
 
@@ -38,13 +38,27 @@ export function takeOver(s0, pid) {
   return s;
 }
 
+export const PID_RE = /^[a-z0-9]{1,16}$/;
+
+// Identifies the exact question/turn an in-game action was made for, so a late or retried action
+// can't land on the next one.
+export function stageKey(s) {
+  const g = s.g;
+  if (!g) return '';
+  return [s.gameNo, g.round, g.stage, g.mi, g.i, g.hole, g.turn, g.ti, g.gs, g.ride?.stage, g.ride?.restarts, g.turnNo, g.spinNo]
+    .map((x) => x ?? '').join(':');
+}
+
 // Apply one player action. Returns {state} (same object when nothing changed) or {state, error}.
 export function apply(s0, pid, a, now, rng = Math.random) {
-  if (!a || typeof a.type !== 'string') return { state: s0, error: 'Bad action' };
+  if (!a || typeof a !== 'object' || typeof a.type !== 'string') return { state: s0, error: 'Bad action' };
+  if (typeof pid !== 'string' || !PID_RE.test(pid)) return { state: s0, error: 'Bad player id' };
+  if (a.id != null && !Number.isSafeInteger(a.id)) return { state: s0, error: 'Bad action id' };
   if (a.id != null && (s0.lastAct[pid] ?? 0) >= a.id) return { state: s0 }; // resent duplicate
   const s = clone(s0);
-  const error = handle(s, pid, a, now, rng);
-  if (error) return { state: s0, error };
+  let error;
+  try { error = handle(s, pid, a, now, rng); } catch { error = 'Bad action'; } // fail closed, never crash the host loop
+  if (error) return { state: s0, error: typeof error === 'string' ? error : 'Bad action' };
   if (a.id != null) s.lastAct[pid] = a.id;
   s.v++;
   return { state: s };
@@ -87,7 +101,7 @@ function handle(s, pid, a, now, rng) {
       return;
     case 'setGame':
       if (!lobby) return 'Only in the lobby';
-      if (!GAMES[a.game]) return 'Unknown game';
+      if (!Object.hasOwn(GAMES, a.game)) return 'Unknown game';
       s.game = a.game;
       return;
     case 'setLaps':
@@ -144,8 +158,9 @@ function handle(s, pid, a, now, rng) {
       return SKIP[s.g.type](s, now, rng);
     default: {
       if (s.phase !== 'game') return 'No game running';
+      if (!Object.hasOwn(ACTS[s.g.type], a.type)) return 'Unknown action';
+      if (a.at !== stageKey(s)) return 'Too late — that moment has passed';
       const f = ACTS[s.g.type][a.type];
-      if (!f) return 'Unknown action';
       if (!s.g.players.includes(pid)) return 'You are spectating this game';
       return f(s, pid, a, now, rng);
     }
@@ -163,7 +178,7 @@ function give(s, list, reason, now) {
     s.drinks.push({ pid, units, shots: c.shots, text: c.text, gn: s.gameNo, game: s.g?.type, reason });
     items.push({ pid, name: nameOf(s, pid), text: c.text });
   }
-  s.callout = { id: ++s.seq, items, reason, at: now };
+  s.callouts = [...s.callouts, { id: ++s.seq, items, reason, at: now }].slice(-6); // a few, so phones that skip a version still see each one
 }
 
 function finish(s) {

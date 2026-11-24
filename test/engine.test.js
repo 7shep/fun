@@ -12,8 +12,9 @@ function room(n = 3, rng = seeded(1)) {
   const ids = ['p0'];
   for (let i = 1; i < n; i++) { ids.push('p' + i); s = ok(E.apply(s, 'p' + i, { type: 'join', name: 'P' + i }, now)); }
   const ctx = { get s() { return s; }, ids, rng, get now() { return now; } };
-  ctx.do = (pid, a) => { s = ok(E.apply(s, pid, a, now, rng)); return s; };
-  ctx.try = (pid, a) => E.apply(s, pid, a, now, rng);
+  const stamp = (a) => (s.phase === 'game' && a.at === undefined ? { ...a, at: E.stageKey(s) } : a);
+  ctx.do = (pid, a) => { s = ok(E.apply(s, pid, stamp(a), now, rng)); return s; };
+  ctx.try = (pid, a) => E.apply(s, pid, stamp(a), now, rng);
   ctx.wait = (ms) => { now += ms; s = E.tick(s, now, rng); return s; };
   ctx.start = (game) => {
     ctx.do('p0', { type: 'setGame', game });
@@ -162,4 +163,42 @@ test('host takeover bumps epoch and keeps the game', () => {
   assert.equal(s2.hostId, 'p1');
   assert.equal(s2.epoch, r.s.epoch + 1);
   assert.deepEqual(s2.g, r.s.g);
+});
+
+test('prototype-named or unknown actions fail closed without throwing', () => {
+  const r = room(3);
+  r.start('nhie');
+  const s = r.s;
+  for (const t of ['hasOwnProperty', 'valueOf', '__proto__', 'constructor', 'toString', 'isPrototypeOf', 'nope']) {
+    const out = E.apply(s, 'p1', { type: t, id: 1, at: E.stageKey(s) }, r.now);
+    assert.equal(typeof out.error, 'string', t);
+    assert.equal(out.state, s);
+  }
+  const lobby = room(3);
+  for (const game of ['constructor', '__proto__', 'toString']) assert.ok(lobby.try('p0', { type: 'setGame', game }).error);
+  assert.ok(E.apply(s, '__proto__', { type: 'join', name: 'Evil' }, r.now).error);
+  assert.ok(E.apply(s, 'p1', { type: 'nhieAnswer', have: true, id: 'x' }, r.now).error);
+});
+
+test('a late or retried answer cannot land on the next statement', () => {
+  const r = room(3);
+  r.start('nhie');
+  const oldKey = E.stageKey(r.s);
+  r.wait(E.T.ask);          // nobody answered; timer reveals
+  r.do('p0', { type: 'next' });
+  assert.equal(r.s.g.i, 1);
+  const late = E.apply(r.s, 'p1', { type: 'nhieAnswer', have: true, id: 99, at: oldKey }, r.now);
+  assert.match(late.error, /late/i);
+  assert.equal(late.state.g.answers.p1, undefined);
+  assert.match(E.apply(r.s, 'p1', { type: 'nhieAnswer', have: true }, r.now).error, /late/i); // unstamped fails closed
+});
+
+test('every drink event is kept in the recent callouts list', () => {
+  const r = room(2);
+  r.start('bus');
+  const p = r.s.g.players[0];
+  for (const guess of ['red', 'higher']) r.do(p, { type: 'busGuess', guess });
+  const wrong = r.s.drinks.length;
+  assert.equal(r.s.callouts.length, wrong);
+  assert.deepEqual(r.s.callouts.map((c) => c.id), [...r.s.callouts.map((c) => c.id)].sort((a, b) => a - b));
 });

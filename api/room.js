@@ -5,7 +5,7 @@ import { neon } from '@neondatabase/serverless';
 const sql = neon(process.env.DATABASE_URL);
 const CODE = /^[A-Z]{4}$/;
 const PID = /^[a-z0-9]{1,16}$/;
-const MAX_BODY = 512 * 1024;
+const MAX_BODY = 4 * 1024 * 1024; // Vercel caps bodies at 4.5 MB
 
 export const SCHEMA = [
   `create table if not exists lcl_rooms (code text primary key, state jsonb not null, epoch int not null, v int not null,
@@ -24,14 +24,20 @@ export default async function handler(req, res) {
   try { if (typeof b === 'string') b = JSON.parse(b); } catch { return res.status(400).json({ error: 'Bad JSON' }); }
   if (!b || typeof b !== 'object') return res.status(400).json({ error: 'Bad request' });
   const { op, code, pid } = b;
-  if (!CODE.test(code ?? '') || !PID.test(pid ?? '')) return res.status(400).json({ error: 'Bad room or player id' });
+  if (typeof code !== 'string' || typeof pid !== 'string' || !CODE.test(code) || !PID.test(pid)) return res.status(400).json({ error: 'Bad room or player id' });
   if (JSON.stringify(b).length > MAX_BODY) return res.status(413).json({ error: 'Too big' });
   try {
     if (op === 'poll') return res.json(await poll(code, pid, b.since));
-    if (op === 'state') return res.json(await putState(code, b.s));
+    if (op === 'state') {
+      const s = b.s;
+      if (!s || typeof s !== 'object' || s.code !== code || !Number.isInteger(s.epoch) || !Number.isInteger(s.v)
+        || typeof s.hostId !== 'string' || !PID.test(s.hostId)) return res.status(400).json({ error: 'Bad state' });
+      return res.json(await putState(code, s, Number.isFinite(b.at) ? Math.round(b.at) : Date.now()));
+    }
     if (op === 'msg') {
-      if (b.to != null && !PID.test(b.to)) return res.status(400).json({ error: 'Bad recipient' });
+      if (b.to != null && (typeof b.to !== 'string' || !PID.test(b.to))) return res.status(400).json({ error: 'Bad recipient' });
       if (!b.payload || typeof b.payload !== 'object') return res.status(400).json({ error: 'Bad payload' });
+      if (b.payload.t === 'act') b.payload.pid = pid; // an action always comes from the phone that posted it
       await sql`insert into lcl_msgs (code, to_pid, payload) values (${code}, ${b.to ?? null}, ${JSON.stringify(b.payload)}::jsonb)`;
       return res.json({ ok: true });
     }
@@ -66,16 +72,16 @@ async function poll(code, pid, since) {
   };
 }
 
-async function putState(code, s) {
-  if (!s || typeof s !== 'object' || s.code !== code || !Number.isInteger(s.epoch) || !Number.isInteger(s.v) || !PID.test(s.hostId ?? '')) {
-    throw new Error('Bad state');
-  }
-  // only newer (epoch, v) wins, so out-of-order writes and a returning old host can't roll the room back
+// at = the host phone's clock, so other phones can line their timers up with the host's deadlines
+async function putState(code, s, at) {
+  // A newer epoch (a takeover) always wins. Within an epoch only that epoch's host may write, and only newer
+  // versions, so out-of-order writes, a second claimant, or a returning old host can't roll the room back.
   const rows = await sql`insert into lcl_rooms (code, state, epoch, v, host_id, at_ms, updated_at)
-      values (${code}, ${JSON.stringify(s)}::jsonb, ${s.epoch}, ${s.v}, ${s.hostId}, ${Date.now()}, now())
+      values (${code}, ${JSON.stringify(s)}::jsonb, ${s.epoch}, ${s.v}, ${s.hostId}, ${at}, now())
     on conflict (code) do update set state = excluded.state, epoch = excluded.epoch, v = excluded.v,
       host_id = excluded.host_id, at_ms = excluded.at_ms, updated_at = now()
-    where lcl_rooms.epoch < excluded.epoch or (lcl_rooms.epoch = excluded.epoch and lcl_rooms.v < excluded.v)
+    where lcl_rooms.epoch < excluded.epoch
+      or (lcl_rooms.epoch = excluded.epoch and lcl_rooms.host_id = excluded.host_id and lcl_rooms.v < excluded.v)
     returning code`;
   if (s.v === 1) { // new room: sweep stale data now and then
     await sql.transaction([
@@ -84,5 +90,7 @@ async function putState(code, s) {
       sql`delete from lcl_seen where at < now() - interval '1 day'`,
     ]);
   }
-  return { ok: true, applied: rows.length > 0 };
+  if (rows.length) return { ok: true, applied: true };
+  const [cur] = await sql`select epoch, v, host_id from lcl_rooms where code = ${code}`;
+  return { ok: true, applied: false, room: cur ? { epoch: cur.epoch, v: cur.v, hostId: cur.host_id } : null };
 }
