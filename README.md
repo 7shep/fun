@@ -25,7 +25,13 @@ For adults of legal drinking age. Water counts, and nobody has to drink to play.
 node --test
 ```
 
-No dependencies are needed for the tests. They cover the difficulty→callout mapping (including the every-3rd-unit shot rule),
+```powershell
+node scripts/relay-check.mjs https://your-app.vercel.app
+```
+
+The second command checks the live relay's write rules against a deployment (a takeover wins, an old host or a second claimant is refused).
+
+No dependencies are needed for the unit tests. They cover the difficulty→callout mapping (including the every-3rd-unit shot rule),
 the golf bottom-25% cutoff, pickup at par+3, the course physics and solvability, the Ride the Bus guesses, restarts and 10-restart cap,
 the Quip Shots outcomes and round-2 doubling, room codes, the Wheel slices, and full 5-game playthroughs of the engine.
 
