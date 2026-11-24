@@ -96,8 +96,9 @@ function onMsg(m) {
 function adopt(s, at = Date.now(), from = null) {
   const cur = app.state;
   if (s.code !== app.me?.code) return;
-  if (cur && !app.forceAdopt && !(s.epoch > cur.epoch || (s.epoch === cur.epoch && s.v > cur.v))) return;
-  app.forceAdopt = false;
+  const forced = app.forceAdopt && from != null; // only the room's copy from the network clears a forced re-sync
+  if (cur && !forced && !(s.epoch > cur.epoch || (s.epoch === cur.epoch && s.v > cur.v))) return;
+  if (forced) app.forceAdopt = false;
   app.state = s;
   app.helloWanted = false;
   app.offset = s.hostId === me() ? 0 : (Number(at) || Date.now()) - Date.now();

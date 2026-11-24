@@ -1177,7 +1177,6 @@ li.player:nth-child(even) {
   overflow-y: auto;
   padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
   border-radius: 18px 18px 0 0;
-  border-top: 4px solid var(--gold);
   background: linear-gradient(180deg, #4a1518 0%, #1d0708 100%);
   color: var(--cream);
   box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.6);
