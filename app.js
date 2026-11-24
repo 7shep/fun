@@ -169,6 +169,7 @@ function resume(seat) {
   openNet(seat.code);
 }
 function failJoin(msg) {
+  app.prefillCode = app.me?.code ?? app.prefillCode; // keep the code so only the name needs fixing
   app.net?.close(); app.net = null; app.joining = null; app.state = null;
   app.view = 'join'; app.error = msg;
   render();

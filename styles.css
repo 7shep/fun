@@ -1006,7 +1006,7 @@ li.player:nth-child(even) {
   padding: 18px 16px;
   overflow-x: hidden;
   overflow-y: auto;
-  background: radial-gradient(circle at 50% 45%, rgba(255, 224, 138, 0.45) 0%, #6b1212 35%, #2a0606 70%, #100303 100%);
+  background: radial-gradient(circle at 50% 45%, rgba(255, 224, 138, 0.22) 0%, #6b1212 35%, #2a0606 70%, #100303 100%);
 }
 .callout.show {
   display: flex;
@@ -1074,6 +1074,7 @@ li.player:nth-child(even) {
   line-height: 1.15;
   color: var(--cream);
   text-transform: uppercase;
+  text-shadow: 0 2px 0 #2a0606, 0 0 10px #2a0606;
   overflow-wrap: anywhere;
 }
 .callout-sub {
@@ -1544,10 +1545,7 @@ svg.wheel {
 
 /* ---------- 27. Banner (status strip) ----------------------------------- */
 .banner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
+  display: block;
   min-height: 44px;
   padding: 10px 14px;
   border-radius: 12px;
