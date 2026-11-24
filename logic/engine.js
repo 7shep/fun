@@ -32,6 +32,15 @@ export function newRoom(code, pid, name) {
 }
 
 // Host migration: the next player in join order takes over from the last known state.
+export const HOST_TIMEOUT = 20000;
+
+// Failover: after the host has been quiet for HOST_TIMEOUT (seen in a fresh poll), the first other player in
+// join order who is present takes over. Every phone runs the same rule, so only one of them claims the room.
+export function shouldTakeOver(s, me, present, hostQuietMs) {
+  if (!s || s.hostId === me || !(hostQuietMs > HOST_TIMEOUT)) return false;
+  return s.players.find((p) => p.id !== s.hostId && present.has(p.id))?.id === me;
+}
+
 export function takeOver(s0, pid) {
   const s = clone(s0);
   s.epoch++; s.v++; s.hostId = pid;

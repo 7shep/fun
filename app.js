@@ -9,7 +9,6 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const SEAT = 'lcl-seat';
-const HOST_TIMEOUT = 20000;
 
 const app = {
   view: 'home', error: '', me: null, state: null, net: null, ready: false, present: new Set(),
@@ -48,7 +47,7 @@ function openNet(code) {
     onReady: () => { app.ready = true; if (amHost()) broadcastState(); else hello(); },
     onStatus: (st) => { if (st !== 'SUBSCRIBED') app.ready = false; },
     onPolled: () => {
-      if (app.state && !amHost() && Date.now() - app.lastHostSeen > HOST_TIMEOUT) maybeTakeOver();
+      if (E.shouldTakeOver(app.state, me(), app.present, Date.now() - app.lastHostSeen)) maybeTakeOver();
     },
     onWrite,
   });
@@ -135,10 +134,7 @@ function act(a) {
 }
 
 function maybeTakeOver() {
-  const s = app.state;
-  const next = s.players.find((p) => p.id !== s.hostId && app.present.has(p.id));
-  if (next?.id !== me()) return;
-  commit(E.takeOver(s, me()));
+  commit(E.takeOver(app.state, me()));
   toast('The host went quiet — you are the host now!');
 }
 

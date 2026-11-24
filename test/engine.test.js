@@ -212,3 +212,16 @@ test('a room saved before callouts existed still takes drink calls', () => {
   for (const x of outs) assert.equal(x.error, undefined);
   assert.ok(outs.some((x) => x.state.callouts?.length === 1)); // one of the two was wrong and made a callout
 });
+
+test('failover: only the first present non-host player claims, and only after the timeout', () => {
+  const r = room(4); // p0 host, then p1, p2, p3 in join order
+  const all = new Set(['p1', 'p2', 'p3']);
+  const late = E.HOST_TIMEOUT + 1;
+  assert.equal(E.shouldTakeOver(r.s, 'p1', all, E.HOST_TIMEOUT), false); // not quiet long enough
+  assert.equal(E.shouldTakeOver(r.s, 'p1', all, late), true);
+  assert.equal(E.shouldTakeOver(r.s, 'p2', all, late), false); // p1 goes first
+  assert.equal(E.shouldTakeOver(r.s, 'p2', new Set(['p2', 'p3']), late), true); // p1 gone too
+  assert.equal(E.shouldTakeOver(r.s, 'p0', all, late), false); // the host never takes over from itself
+  assert.equal(E.shouldTakeOver(r.s, 'p3', new Set(), late), false); // a phone that sees nobody (offline) stays put
+  assert.equal(E.shouldTakeOver(null, 'p1', all, late), false);
+});
