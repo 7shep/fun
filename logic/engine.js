@@ -178,7 +178,7 @@ function give(s, list, reason, now) {
     s.drinks.push({ pid, units, shots: c.shots, text: c.text, gn: s.gameNo, game: s.g?.type, reason });
     items.push({ pid, name: nameOf(s, pid), text: c.text });
   }
-  s.callouts = [...s.callouts, { id: ++s.seq, items, reason, at: now }].slice(-6); // a few, so phones that skip a version still see each one
+  s.callouts = [...(s.callouts ?? []), { id: ++s.seq, items, reason, at: now }].slice(-6); // a few, so phones that skip a version still see each one
 }
 
 function finish(s) {

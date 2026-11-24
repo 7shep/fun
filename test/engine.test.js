@@ -202,3 +202,13 @@ test('every drink event is kept in the recent callouts list', () => {
   assert.equal(r.s.callouts.length, wrong);
   assert.deepEqual(r.s.callouts.map((c) => c.id), [...r.s.callouts.map((c) => c.id)].sort((a, b) => a - b));
 });
+
+test('a room saved before callouts existed still takes drink calls', () => {
+  const r = room(2);
+  r.start('bus');
+  delete r.s.callouts;
+  const p = r.s.g.players[0];
+  const outs = ['red', 'black'].map((guess) => E.apply(r.s, p, { type: 'busGuess', guess, at: E.stageKey(r.s) }, r.now));
+  for (const x of outs) assert.equal(x.error, undefined);
+  assert.ok(outs.some((x) => x.state.callouts?.length === 1)); // one of the two was wrong and made a callout
+});
