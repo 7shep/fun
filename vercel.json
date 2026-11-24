@@ -1,6 +1,5 @@
 {
-  "buildCommand": "node scripts/write-config.mjs",
-  "outputDirectory": ".",
-  "installCommand": "",
-  "framework": null
+  "framework": null,
+  "buildCommand": "echo static site, nothing to build",
+  "outputDirectory": "."
 }

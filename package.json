@@ -1,1 +1,1 @@
-{"name":"last-call-live","private":true,"type":"module","scripts":{"test":"node --test"}}
+{"name":"last-call-live","private":true,"type":"module","scripts":{"test":"node --test"},"dependencies":{"@neondatabase/serverless":"^1.2.1"}}

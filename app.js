@@ -3,7 +3,7 @@ import * as E from './logic/engine.js';
 import { LEVELS, SLICES, isRed, makeRoomCode, validateName } from './logic/rules.js';
 import { HOLES, W, H, BALL_R, CUP_R, moverRect } from './logic/golf.js';
 import { TERMS, AWARD_BLURBS } from './logic/content.js';
-import { connect, configured } from './net.js';
+import { connect } from './net.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -57,12 +57,8 @@ function onMsg(m) {
     case 'state': if (m.s && typeof m.s === 'object') adopt(m.s, m.at, m.from); break;
     case 'hb':
       if (!s) return;
-      if (m.hostId === s.hostId) app.lastHostSeen = Date.now();
+      if (m.hostId === s.hostId) app.lastHostSeen = Math.max(app.lastHostSeen, Date.now() - (m.age ?? 0));
       if (m.epoch > s.epoch || (m.epoch === s.epoch && m.v > s.v)) app.helloWanted = true;
-      break;
-    case 'hello':
-      // the host answers; others answer only if the host itself is rejoining or has gone quiet
-      if (s && (amHost() || m.pid === s.hostId || Date.now() - app.lastHostSeen > 6000)) send({ t: 'state', s, at: hostNow(), from: me() });
       break;
     case 'act': if (amHost() && m.a && typeof m.a === 'object') hostApply(m.pid, m.a); break;
     case 'err':
@@ -122,6 +118,7 @@ function maybeTakeOver() {
 
 function loop() {
   const s = app.state, now = Date.now();
+  app.net?.tick();
   if (!app.net || !app.ready) return;
   if (!s) { if (now - app.lastHello > 3000) hello(); return; }
   if (amHost()) {
@@ -142,7 +139,6 @@ function loop() {
 
 /* ---------------- room entry ---------------- */
 function createRoom(name) {
-  if (!configured()) return fail('Realtime is not configured. Copy config.example.js to config.js (see README).');
   const v = validateName(name, []);
   if (!v.ok) return fail(v.error);
   const code = makeRoomCode();
@@ -153,7 +149,6 @@ function createRoom(name) {
   openNet(code);
 }
 function joinRoom(code, name) {
-  if (!configured()) return fail('Realtime is not configured. Copy config.example.js to config.js (see README).');
   code = String(code || '').trim().toUpperCase();
   if (!/^[A-Z]{4}$/.test(code)) return fail('Room codes are 4 letters');
   const v = validateName(name, []);
@@ -308,7 +303,6 @@ function homeHtml() {
     <h1 class="logo"><span>LAST CALL</span><span>LIVE!</span></h1>
     <p class="lead">The game show where everybody loses (their dignity).</p>
     ${app.error ? `<div class="banner warn">${esc(app.error)}</div>` : ''}
-    ${!configured() ? '<div class="banner warn">Realtime is not configured yet — see README.</div>' : ''}
     <button class="btn primary" data-do="goCreate">Create Game</button>
     <button class="btn secondary" data-do="goJoin">Join Game</button>
     ${old ? `<button class="btn ghost" data-do="rejoin">Rejoin ${esc(old.code)} as ${esc(old.name)}</button>` : ''}
@@ -860,6 +854,8 @@ document.addEventListener('submit', (ev) => {
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && app.net && app.state && !amHost()) hello(); });
 
+window.lcl = { app, act }; // debug/test handle (devtools cheating is out of scope)
+
 /* ---------------- boot ---------------- */
 const qsRoom = new URLSearchParams(location.search).get('room');
 if (qsRoom) app.prefillCode = qsRoom.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
@@ -869,6 +865,6 @@ else if (app.prefillCode) app.view = 'join';
 render();
 // A worker clock keeps the host loop ticking when the tab is in the background (main-thread timers get throttled).
 try {
-  const w = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 500)'], { type: 'text/javascript' })));
+  const w = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 200)'], { type: 'text/javascript' })));
   w.onmessage = () => { loop(); updateTimers(); };
-} catch { setInterval(() => { loop(); updateTimers(); }, 500); }
+} catch { setInterval(() => { loop(); updateTimers(); }, 200); }
