@@ -1445,8 +1445,13 @@ svg.wheel {
   width: 100%;
   height: 100%;
   max-width: 100%;
-  transition: transform 4.5s cubic-bezier(0.12, 0.6, 0.1, 1);
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
+}
+.wheel-rot {
+  transition: transform 4.5s cubic-bezier(0.12, 0.6, 0.1, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .wheel-rot { transition-duration: 0.01s; }
 }
 /* Gold pointer at top centre, pointing down into the wheel. */
 .wheel-pointer {

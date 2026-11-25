@@ -794,18 +794,18 @@ function wheelSvg() {
   });
   for (let i = 0; i < 20; i++) { const [x, y] = pt(i * 18, 97); out += `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="2" fill="#fff6c9"/>`; }
   const div = document.createElement('div');
-  div.innerHTML = `<svg class="wheel" viewBox="-100 -100 200 200" role="img" aria-label="Wheel of Misfortune">${out}<circle r="13" fill="#f2c14e" stroke="#3b220f" stroke-width="2"/></svg>`;
+  div.innerHTML = `<svg class="wheel" viewBox="-100 -100 200 200" role="img" aria-label="Wheel of Misfortune"><g class="wheel-rot">${out}</g><circle r="13" fill="#f2c14e" stroke="#3b220f" stroke-width="2"/></svg>`;
   return div.firstElementChild;
 }
 function wheelMount(s) {
   const slot = $('#wheel-slot'), g = s.g;
   if (!slot) return;
   wheel.el ??= wheelSvg();
-  const el = wheel.el;
+  const el = wheel.el, rot = el.querySelector('.wheel-rot'); // spin the slices inside the svg so its box never grows past the screen
   const setRot = (deg, animate) => {
-    if (!animate) el.style.transition = 'none';
-    el.style.transform = `rotate(${deg}deg)`;
-    if (!animate) { el.getBoundingClientRect(); el.style.transition = ''; }
+    if (!animate) rot.style.transition = 'none';
+    rot.style.transform = `rotate(${deg}deg)`;
+    if (!animate) { rot.getBoundingClientRect(); rot.style.transition = ''; }
   };
   if (el.parentNode !== slot) { slot.prepend(el); setRot(wheel.rot, false); }
   const key = `${s.code}-${s.gameNo}-${g.spinNo}`;
