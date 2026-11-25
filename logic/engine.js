@@ -84,6 +84,9 @@ export function tick(s0, now, rng = Math.random) {
   return s;
 }
 
+// Each player drinks at their own level; anyone who hasn't picked uses the room default.
+export const levelOf = (s, pid) => s.players.find((p) => p.id === pid)?.level ?? s.difficulty;
+
 function handle(s, pid, a, now, rng) {
   const inRoom = s.players.some((p) => p.id === pid);
   if (a.type === 'join') {
@@ -102,6 +105,10 @@ function handle(s, pid, a, now, rng) {
       if (!lobby) return 'Only in the lobby';
       if (a.target === s.hostId) return 'The host cannot be kicked';
       s.players = s.players.filter((p) => p.id !== a.target);
+      return;
+    case 'setLevel': // your own tolerance; changeable any time, even mid-game
+      if (!R.LEVELS.some((l) => l.id === a.level)) return 'Unknown level';
+      s.players.find((p) => p.id === pid).level = a.level;
       return;
     case 'setDifficulty':
       if (!lobby) return 'Only in the lobby';
@@ -192,8 +199,8 @@ function give(s, list, reason, now) {
   if (!by.size) return;
   const items = [];
   for (const [pid, units] of by) {
-    const c = R.drinkCallout(s.difficulty, unitsOf(s, pid), units);
-    s.drinks.push({ pid, units, shots: c.shots, text: c.text, gn: s.gameNo, game: s.g?.type, reason });
+    const level = levelOf(s, pid), c = R.drinkCallout(level, unitsOf(s, pid), units);
+    s.drinks.push({ pid, units, shots: c.shots, text: c.text, level, gn: s.gameNo, game: s.g?.type, reason });
     items.push({ pid, name: nameOf(s, pid), text: c.text });
   }
   s.callouts = [...(s.callouts ?? []), { id: ++s.seq, items, reason, at: now }].slice(-6); // a few, so phones that skip a version still see each one

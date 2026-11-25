@@ -303,3 +303,18 @@ test('blind NHIE: Never-voters guess who said I Have; right picks make them drin
   }
   checkTally(r.s);
 });
+
+test('each player drinks at their own level', () => {
+  const r = room(2);
+  assert.equal(E.levelOf(r.s, 'p1'), 'fun'); // not picked yet: room default
+  r.do('p1', { type: 'setLevel', level: 'alcoholism' }); // anyone can set their own, no host needed
+  assert.match(r.try('p0', { type: 'setLevel', level: 'nope' }).error, /Unknown/);
+  r.start('nhie');
+  r.do('p0', { type: 'setLevel', level: 'tipsy' }); // and change it mid-game
+  for (const p of r.ids) r.do(p, { type: 'nhieAnswer', have: true });
+  const [d0, d1] = ['p0', 'p1'].map((p) => r.s.drinks.find((d) => d.pid === p));
+  assert.equal(d0.level, 'tipsy');
+  assert.equal(d1.level, 'alcoholism');
+  assert.notEqual(d0.text, d1.text);
+  assert.equal(r.s.players.find((p) => p.id === 'p0').level, 'tipsy');
+});

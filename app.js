@@ -351,8 +351,7 @@ function formHtml(kind) {
 }
 
 function lobbyHtml(s) {
-  const host = amHost(), G = E.GAMES[s.game], lvl = LEVELS.find((l) => l.id === s.difficulty);
-  const shotRule = ['sending', 'blackout', 'alcoholism'].includes(s.difficulty) ? ' · every 3rd unit is a shot' : '';
+  const host = amHost(), G = E.GAMES[s.game];
   const mine = s.custom.filter((c) => c.authorId === me());
   const count = (k) => s.custom.filter((c) => c.kind === k).length;
   const link = `${location.origin}${location.pathname}?room=${s.code}`;
@@ -361,7 +360,7 @@ function lobbyHtml(s) {
       <div class="small">Friends join at <b>${esc(link.replace(/^https?:\/\//, ''))}</b></div></div>
     <div class="panel"><h2 class="subtitle">Contestants ${s.players.length}/12</h2>
       <ul class="player-list">${s.players.map((p) => `<li class="player"><span>${esc(p.name)}</span><span class="spacer"></span>
-        ${p.id === s.hostId ? '<span class="badge host">HOST</span>' : ''}${p.id === me() ? '<span class="badge you">YOU</span>' : ''}
+        <span class="badge">${esc(levelName(s, p.id))}</span>${p.id === s.hostId ? '<span class="badge host">HOST</span>' : ''}${p.id === me() ? '<span class="badge you">YOU</span>' : ''}
         ${app.present.has(p.id) ? '' : '<span class="badge off">AWAY</span>'}
         ${host && p.id !== s.hostId ? `<button class="btn small ghost" data-do="kick" data-id="${esc(p.id)}" aria-label="Remove ${esc(p.name)}">✕</button>` : ''}</li>`).join('')}</ul></div>
     <div class="panel"><h2 class="subtitle">Tonight's Game</h2>
@@ -371,9 +370,7 @@ function lobbyHtml(s) {
         <p class="muted small">${s.blind ? 'Answers stay secret. Everyone who says Never guesses who said I Have: right guesses make them drink, wrong guesses make you drink.' : 'Everyone who says I Have drinks.'}</p>` : ''}
       ${s.game === 'wheel' ? `<h2 class="subtitle">Laps</h2><div class="chips">${[1, 2, 3, 4, 5].map((n) => `<button class="chip ${s.laps === n ? 'on' : ''}" data-do="setLaps" data-id="${n}" ${host ? '' : 'disabled'}>${n}</button>`).join('')}</div>` : ''}
     </div>
-    <div class="panel"><h2 class="subtitle">Drinking Difficulty</h2>
-      <div class="chips">${LEVELS.map((l) => `<button class="chip ${s.difficulty === l.id ? 'on' : ''}" data-do="setDifficulty" data-id="${l.id}" ${host ? '' : 'disabled'}>${l.name}</button>`).join('')}</div>
-      <p class="muted">1 unit = ${esc(lvl.per)}${shotRule}</p></div>
+    <div class="panel">${levelPicker(s)}</div>
     ${host ? `<button class="btn primary" data-do="openTerms" ${s.players.length < G.min ? 'disabled' : ''}>Sign the Contract →</button>
       <button class="btn ghost" data-do="skipTerms" ${s.players.length < G.min ? 'disabled' : ''}>Skip the contract, just play</button>
       ${s.players.length < G.min ? `<p class="muted center">Need ${G.min - s.players.length} more player(s).</p>` : ''}` : waitHost('pick a game')}
@@ -639,11 +636,20 @@ function tallyRows(s) {
     return { p, list, units: list.reduce((a, d) => a + d.units, 0), shots: list.reduce((a, d) => a + d.shots, 0) };
   }).sort((a, b) => b.units - a.units);
 }
+// Your own tolerance: everyone picks, in the lobby or from the tally sheet mid-game.
+const levelName = (s, pid) => LEVELS.find((l) => l.id === E.levelOf(s, pid))?.name ?? '';
+function levelPicker(s) {
+  const mine = E.levelOf(s, me()), lvl = LEVELS.find((l) => l.id === mine);
+  const shotRule = ['sending', 'blackout', 'alcoholism'].includes(mine) ? ' · every 3rd unit is a shot' : '';
+  return `<h2 class="subtitle">Your Drinking Level</h2>
+    <div class="chips">${LEVELS.map((l) => `<button class="chip ${mine === l.id ? 'on' : ''}" data-do="setLevel" data-id="${l.id}">${l.name}</button>`).join('')}</div>
+    <p class="muted">For you, 1 unit = ${esc(lvl.per)}${shotRule}. Everyone picks their own.</p>`;
+}
 function tallyHtml(s) {
-  const rows = tallyRows(s), lvl = LEVELS.find((l) => l.id === s.difficulty);
-  return `<h2 class="title">Drink Tally</h2><p class="muted">Now playing at ${esc(lvl.name)} (1 unit = ${esc(lvl.per)})</p>
+  const rows = tallyRows(s);
+  return `<h2 class="title">Drink Tally</h2>${app.me && s.players.some((p) => p.id === me()) ? levelPicker(s) : ''}
     <table class="board"><tr><th>Player</th><th class="num">Units</th><th class="num">Shots</th></tr>
-      ${rows.map((r) => `<tr class="${r.p.id === me() ? 'me' : ''}"><td>${esc(r.p.name)}</td><td class="num">${r.units}</td><td class="num">${r.shots}</td></tr>`).join('')}</table>
+      ${rows.map((r) => `<tr class="${r.p.id === me() ? 'me' : ''}"><td>${esc(r.p.name)} <span class="muted small">${esc(levelName(s, r.p.id))}</span></td><td class="num">${r.units}</td><td class="num">${r.shots}</td></tr>`).join('')}</table>
     ${rows.filter((r) => r.list.length).map((r) => `<details><summary>${esc(r.p.name)} — ${plural(r.list.length, 'call')}</summary>
       <ol class="small">${r.list.map((d) => `<li>${esc(d.text)} — ${esc(E.GAMES[d.game]?.name ?? '')}: ${esc(d.reason)}</li>`).join('')}</ol></details>`).join('')}
     <button class="btn" data-do="closeSheet">Close</button>`;
@@ -879,6 +885,7 @@ const DO = {
   closeCelebrate: () => $('#celebrate').classList.remove('show'),
   setGame: (el) => act({ type: 'setGame', game: el.dataset.id }),
   setLaps: (el) => act({ type: 'setLaps', laps: Number(el.dataset.id) }),
+  setLevel: (el) => act({ type: 'setLevel', level: el.dataset.id }),
   setBlind: (el) => act({ type: 'setBlind', on: el.dataset.id === '1' }),
   blindPick: (el) => {
     const n = app.state.g.yesCount, ids = app.ui.picks.ids, p = el.dataset.id;
