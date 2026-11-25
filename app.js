@@ -426,8 +426,10 @@ const awardHtml = (a) => `<div class="award"><div class="award-title">${esc(a.ti
 
 /* ---------------- game screens ---------------- */
 function quipHtml(s, g) {
-  const head = `<div class="row"><span class="chip on">Round ${g.round}/2</span>${g.round === 2 ? '<span class="chip">DOUBLE POINTS + UNITS</span>' : ''}</div>`;
+  const head = g.round === 3 ? '<div class="row"><span class="chip on">LAST CALL ROUND</span><span class="chip">TRIPLE STAKES</span></div>'
+    : `<div class="row"><span class="chip on">Round ${g.round}/2</span>${g.round === 2 ? '<span class="chip">DOUBLE POINTS + UNITS</span>' : ''}</div>`;
   const playing = g.players.includes(me());
+  if (g.round === 3) return quipFinalHtml(s, g, head, playing);
   if (g.stage === 'answer') {
     const waiting = g.players.filter((p) => !g.submitted[p]);
     const mine = g.matchups.map((m, i) => [m, i]).filter(([m]) => m.a === me() || m.b === me());
@@ -464,6 +466,45 @@ function quipHtml(s, g) {
     <table class="board"><tr><th>Player</th><th class="num">Points</th></tr>
       ${[...g.players].sort((a, b) => g.points[b] - g.points[a]).map((p) => `<tr class="${p === me() ? 'me' : ''}"><td>${nm(p)}</td><td class="num">${g.points[p]}</td></tr>`).join('')}</table>
     ${hostBtn('Next', 'next')}${waitHost('continue')}
+  </section>`;
+}
+
+function quipFinalHtml(s, g, head, playing) {
+  const f = g.final, promptBox = `<div class="prompt">${esc(f.prompt.text)}${f.prompt.author ? `<div class="muted small">— prompt by ${esc(f.prompt.author)}</div>` : ''}</div>`;
+  if (g.stage === 'finalAnswer') {
+    const waiting = g.players.filter((p) => !g.submitted[p]);
+    return `<section class="screen">${head}<h1 class="title">Everyone answers this one</h1>${promptBox}${timer(g.deadline, E.T.answer)}
+      ${!playing ? '<div class="banner">The contestants are writing…</div>'
+        : g.submitted[me()] ? `<div class="banner">Locked in! Waiting for ${badges(waiting)}</div>`
+        : `<textarea class="field" id="fin-${s.gameNo}" data-final maxlength="80" rows="2" placeholder="Your funniest answer"></textarea>
+          <button class="btn primary" data-do="quipFinalSubmit">Lock it in</button>`}
+    </section>`;
+  }
+  if (g.stage === 'finalVote') {
+    const voters = E.quipFinalVoters(g), canVote = voters.includes(me()) && !f.votes[me()];
+    const max = Math.min(E.FINAL_VOTES, f.order.filter((p) => p !== me() && f.answers[p] !== E.CHICKEN).length);
+    const key = `${s.gameNo}-final`;
+    if (app.ui.finalPicks?.key !== key) app.ui.finalPicks = { key, ids: [] };
+    const picks = app.ui.finalPicks.ids;
+    return `<section class="screen">${head}${promptBox}${timer(g.deadline, E.T.finalVote)}
+      ${canVote ? `<p class="muted center">Pick up to ${max} favorites (not your own).</p>` : ''}
+      <div class="stack">${f.order.map((p) => {
+        const off = !canVote || p === me() || f.answers[p] === E.CHICKEN;
+        return `<button class="vote-option ${picks.includes(p) ? 'on' : ''}" data-do="finalPick" data-id="${esc(p)}" ${off ? 'disabled' : ''} aria-pressed="${picks.includes(p)}">${esc(f.answers[p])}${p === me() ? ' <span class="muted small">(yours)</span>' : ''}</button>`;
+      }).join('')}</div>
+      ${canVote ? `<button class="btn primary" data-do="finalVote" ${picks.length ? '' : 'disabled'}>Cast ${picks.length}/${max} votes</button>`
+        : !playing ? '<div class="banner">Spectating</div>'
+        : `<div class="banner">Votes in! Waiting for ${badges(voters.filter((v) => !f.votes[v]))}</div>`}
+    </section>`;
+  }
+  const L = g.last, rows = [...g.players].sort((a, b) => L.got[b] - L.got[a]);
+  return `<section class="screen">${head}${promptBox}${applause(true)}
+    ${rows.map((p, i) => `<div class="answer ${i === 0 && L.got[p] > 0 ? 'win' : L.drinks[p] ? 'lose' : ''}">
+      <div class="prompt">${esc(f.answers[p])}</div>
+      <div class="small">by <b>${nm(p)}</b> · ${plural(L.got[p], 'vote')} · +${L.got[p] * 300} pts${L.drinks[p] ? ` · drinks ${plural(L.drinks[p], 'unit')}` : ''}</div></div>`).join('')}
+    <table class="board"><tr><th>Player</th><th class="num">Points</th></tr>
+      ${[...g.players].sort((a, b) => g.points[b] - g.points[a]).map((p) => `<tr class="${p === me() ? 'me' : ''}"><td>${nm(p)}</td><td class="num">${g.points[p]}</td></tr>`).join('')}</table>
+    ${hostBtn('Final results', 'next')}${waitHost('continue')}
   </section>`;
 }
 
@@ -724,6 +765,10 @@ function updateTimers() {
     const key = `${s.gameNo}-${g.round}`;
     if (!app.autoSent[key]) { app.autoSent[key] = true; DO.quipSubmit(); }
   }
+  if (g?.type === 'quip' && g.stage === 'finalAnswer' && g.players.includes(me()) && !g.submitted[me()] && g.deadline - now < 3000) {
+    const key = `${s.gameNo}-final`;
+    if (!app.autoSent[key]) { app.autoSent[key] = true; DO.quipFinalSubmit(); }
+  }
 }
 
 /* ---------------- golf canvas ---------------- */
@@ -918,6 +963,15 @@ const DO = {
     act({ type: 'quipAnswer', answers });
   },
   quipVote: (el) => act({ type: 'quipVote', choice: el.dataset.id }),
+  quipFinalSubmit: () => act({ type: 'quipFinalAnswer', text: $('#app textarea[data-final]')?.value ?? '' }),
+  finalPick: (el) => {
+    const f = app.state.g.final, ids = app.ui.finalPicks.ids, p = el.dataset.id;
+    const max = Math.min(E.FINAL_VOTES, f.order.filter((x) => x !== me() && f.answers[x] !== E.CHICKEN).length);
+    if (ids.includes(p)) ids.splice(ids.indexOf(p), 1);
+    else { if (ids.length >= max) ids.shift(); ids.push(p); }
+    render();
+  },
+  finalVote: () => act({ type: 'quipFinalVote', picks: [...app.ui.finalPicks.ids] }),
   nhie: (el) => act({ type: 'nhieAnswer', have: el.dataset.id === '1' }),
   busGuess: (el) => act({ type: 'busGuess', guess: el.dataset.id }),
   wheelSpin: () => act({ type: 'wheelSpin' }),

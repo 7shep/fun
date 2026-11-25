@@ -31,7 +31,12 @@ export const status = (() => {
         const m = g.matchups[g.mi];
         if (m.a !== me && m.b !== me && !g.votes[me]) return A({ type: 'quipVote', choice: pick(['a', 'b']) });
       }
-      if (g.stage === 'reveal' && host) return setTimeout(() => A({ type: 'next' }), 800);
+      if (g.stage === 'finalAnswer' && !g.submitted[me]) return A({ type: 'quipFinalAnswer', text: `${app.me.name} final ${Math.random().toString(36).slice(2, 6)}` });
+      if (g.stage === 'finalVote' && !g.final.votes[me]) {
+        const t = g.players.filter((p) => p !== me && g.final.answers[p] !== '[chickened out]').sort(() => Math.random() - 0.5);
+        if (t.length) return A({ type: 'quipFinalVote', picks: t.slice(0, 1 + Math.floor(Math.random() * Math.min(3, t.length))) });
+      }
+      if ((g.stage === 'reveal' || g.stage === 'finalReveal') && host) return setTimeout(() => A({ type: 'next' }), 800);
     }
     if (g.type === 'nhie') {
       if (g.stage === 'ask' && !(me in g.answers)) return A({ type: 'nhieAnswer', have: Math.random() < 0.4 });

@@ -5,7 +5,7 @@ import { HOLES, simulateShot, isPickedUp, golfCutoff } from './golf.js';
 import { QUIP_PROMPTS, NHIE_STATEMENTS } from './content.js';
 
 export const GAMES = {
-  quip: { name: 'Quip Shots', min: 3, blurb: 'Write the funniest answer. The room votes. Losers drink.' },
+  quip: { name: 'Quip Shots', min: 3, blurb: 'Write the funniest answer. The room votes. Losers drink. Two rounds, then the Last Call Round: everyone answers one prompt, triple stakes.' },
   golf: { name: 'Golf', min: 2, blurb: 'Nine holes of top-down mini-golf. Bottom 25% drink every hole.' },
   nhie: { name: 'Never Have I Ever', min: 2, blurb: 'Twenty confessions. Every "I Have" drinks.' },
   bus: { name: 'Ride the Bus', min: 2, blurb: 'Guess the cards. The worst guesser rides the bus.' },
