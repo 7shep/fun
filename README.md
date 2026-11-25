@@ -4,7 +4,7 @@ A retro game-show drinking-game website for friends in the same room. Every play
 phone, and every phone shows the same screen. Phones only differ when a player types an answer, votes or guesses.
 
 **Games:** Quip Shots · Golf (9-hole top-down mini-golf) · Never Have I Ever · Ride the Bus · Wheel of Misfortune.
-Includes 5 drinking difficulties, a fake Terms & Conditions screen before every game (the host can skip it), a drink tally, awards, and custom prompts.
+Every player picks their own drinking level (5 levels, changeable any time). Never Have I Ever has a blind mode where the Nevers guess who said I Have. Includes a fake Terms & Conditions screen before every game (the host can skip it), a drink tally, awards, and custom prompts.
 
 Live at https://fun.alexshepherd.dev.
 
