@@ -248,3 +248,58 @@ test('the host can skip the contract from the lobby or stop waiting on signature
   q.do('p0', { type: 'setGame', game: 'quip' });
   assert.match(q.try('p0', { type: 'startGame', skip: true }).error, /at least 3/); // the player minimum still holds
 });
+
+test('blind NHIE: Never-voters guess who said I Have; right picks make them drink, wrong picks make the guesser drink', () => {
+  const r = room(4);
+  assert.match(r.try('p1', { type: 'setBlind', on: true }).error, /host/);
+  r.do('p0', { type: 'setBlind', on: true });
+  r.start('nhie');
+  assert.equal(r.s.g.blind, true);
+  const units = (pid) => r.s.drinks.filter((d) => d.pid === pid).reduce((a, d) => a + d.units, 0);
+  r.do('p1', { type: 'nhieAnswer', have: true });
+  r.do('p2', { type: 'nhieAnswer', have: true });
+  r.do('p0', { type: 'nhieAnswer', have: false });
+  r.do('p3', { type: 'nhieAnswer', have: false });
+  assert.equal(r.s.g.stage, 'guess');
+  assert.equal(r.s.g.yesCount, 2);
+  assert.deepEqual(r.s.g.guessers, ['p0', 'p3']);
+  assert.equal(r.s.drinks.length, 0); // no "I have" drinking in blind mode
+  assert.match(r.try('p1', { type: 'nhieGuess', picks: ['p2', 'p3'] }).error, /Never/);
+  assert.match(r.try('p0', { type: 'nhieGuess', picks: ['p1'] }).error, /exactly 2/);
+  assert.match(r.try('p0', { type: 'nhieGuess', picks: ['p0', 'p1'] }).error, /other players/);
+  assert.match(r.try('p0', { type: 'nhieGuess', picks: ['p1', 'p1'] }).error, /other players/);
+  r.do('p0', { type: 'nhieGuess', picks: ['p1', 'p3'] }); // p1 right, p3 wrong
+  assert.match(r.try('p0', { type: 'nhieGuess', picks: ['p1', 'p2'] }).error, /already/);
+  assert.equal(r.s.g.stage, 'guess');
+  r.do('p3', { type: 'nhieGuess', picks: ['p1', 'p2'] }); // both right
+  assert.equal(r.s.g.stage, 'reveal');
+  assert.deepEqual([units('p0'), units('p1'), units('p2'), units('p3')], [1, 2, 1, 0]);
+  assert.deepEqual(r.s.g.last.results.map((x) => x.picks.map((m) => m.right)), [[true, false], [true, true]]);
+  assert.deepEqual(r.s.g.last.have, ['p1', 'p2']);
+
+  // the guess timer runs out: whoever didn't guess is skipped, the rest still count
+  r.do('p0', { type: 'next' });
+  r.do('p0', { type: 'nhieAnswer', have: true });
+  for (const p of ['p1', 'p2', 'p3']) r.do(p, { type: 'nhieAnswer', have: false });
+  r.do('p1', { type: 'nhieGuess', picks: ['p2'] }); // wrong
+  r.wait(E.T.guess);
+  assert.equal(r.s.g.stage, 'reveal');
+  assert.equal(r.s.g.last.results.filter((x) => x.skipped).length, 2);
+  assert.equal(units('p1'), 3);
+
+  // nobody said I have: nothing to guess, straight to the reveal
+  r.do('p0', { type: 'next' });
+  for (const p of r.ids) r.do(p, { type: 'nhieAnswer', have: false });
+  assert.equal(r.s.g.stage, 'reveal');
+  assert.deepEqual(r.s.g.last.results, []);
+
+  // play it out; the tally still matches the drink log
+  r.do('p0', { type: 'next' });
+  for (let guard = 0; r.s.phase === 'game' && guard < 200; guard++) {
+    const g = r.s.g;
+    if (g.stage === 'ask') for (const p of r.ids) r.do(p, { type: 'nhieAnswer', have: p === 'p2' });
+    else if (g.stage === 'guess') for (const p of g.guessers) r.do(p, { type: 'nhieGuess', picks: [p === 'p3' ? 'p1' : 'p3'] });
+    else r.wait(E.T.reveal);
+  }
+  checkTally(r.s);
+});

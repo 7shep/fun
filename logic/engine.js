@@ -11,11 +11,11 @@ export const GAMES = {
   bus: { name: 'Ride the Bus', min: 2, blurb: 'Guess the cards. The worst guesser rides the bus.' },
   wheel: { name: 'Wheel of Misfortune', min: 2, blurb: 'Spin the wheel and accept your fate.' },
 };
-export const T = { answer: 60000, vote: 30000, ask: 20000, reveal: 25000, spin: 5000, intro: 8000, over: 4000 };
+export const T = { answer: 60000, vote: 30000, ask: 20000, guess: 30000, reveal: 25000, spin: 5000, intro: 8000, over: 4000 };
 export const MAX_PLAYERS = 12;
 export const NHIE_COUNT = 20;
 export const CHICKEN = '[chickened out]';
-const HOST_ACTIONS = new Set(['kick', 'setDifficulty', 'setGame', 'setLaps', 'openTerms', 'startGame', 'toLobby', 'next', 'skipTurn']);
+const HOST_ACTIONS = new Set(['kick', 'setDifficulty', 'setGame', 'setLaps', 'setBlind', 'openTerms', 'startGame', 'toLobby', 'next', 'skipTurn']);
 
 const clone = (o) => structuredClone(o);
 const zeros = (ids) => Object.fromEntries(ids.map((p) => [p, 0]));
@@ -26,7 +26,7 @@ export const unitsOf = (s, pid) => s.drinks.reduce((n, d) => (d.pid === pid ? n 
 export function newRoom(code, pid, name) {
   return {
     code, epoch: 1, v: 1, seq: 0, hostId: pid, players: [{ id: pid, name }],
-    difficulty: 'fun', game: 'quip', laps: 1, phase: 'lobby', terms: null, g: null, gameNo: 0,
+    difficulty: 'fun', game: 'quip', laps: 1, blind: false, phase: 'lobby', terms: null, g: null, gameNo: 0,
     results: null, drinks: [], callouts: [], custom: [], history: [], lastAct: {},
   };
 }
@@ -112,6 +112,11 @@ function handle(s, pid, a, now, rng) {
       if (!lobby) return 'Only in the lobby';
       if (!Object.hasOwn(GAMES, a.game)) return 'Unknown game';
       s.game = a.game;
+      return;
+    case 'setBlind':
+      if (!lobby) return 'Only in the lobby';
+      if (typeof a.on !== 'boolean') return 'Pick on or off';
+      s.blind = a.on;
       return;
     case 'setLaps':
       if (!lobby) return 'Only in the lobby';
@@ -289,16 +294,43 @@ function nhieStart(s, now, rng) {
   const players = s.players.map((p) => p.id);
   const custom = R.shuffle(s.custom.filter((c) => c.kind === 'nhie').map(({ text, author }) => ({ text, author })), rng).slice(0, NHIE_COUNT);
   const starters = R.shuffle(NHIE_STATEMENTS, rng).slice(0, NHIE_COUNT - custom.length).map((text) => ({ text }));
-  return { type: 'nhie', players, list: R.shuffle(custom.concat(starters), rng), i: 0, haves: zeros(players), stage: 'ask', answers: {}, deadline: now + T.ask, last: null };
+  return { type: 'nhie', players, list: R.shuffle(custom.concat(starters), rng), i: 0, haves: zeros(players), stage: 'ask', answers: {}, deadline: now + T.ask, last: null, blind: s.blind === true };
 }
 function nhieReveal(s, now) {
   const g = s.g;
   const have = g.players.filter((p) => g.answers[p] === true);
   const never = g.players.filter((p) => g.answers[p] === false);
+  if (g.blind) {
+    for (const p of have) g.haves[p]++;
+    // Blind mode: only the "I have" count is shown; everyone who said Never guesses who said I Have
+    if (have.length && never.length) {
+      g.stage = 'guess'; g.yesCount = have.length; g.guessers = never; g.guesses = {}; g.deadline = now + T.guess;
+    } else {
+      g.last = { have, never, blind: true, results: [] }; // nobody to catch, or nobody to guess
+      g.stage = 'reveal'; g.deadline = now + T.reveal;
+    }
+    return;
+  }
   const lone = have.length === 1 ? have[0] : null;
   for (const p of have) g.haves[p]++;
   give(s, lone ? [{ pid: lone, units: 2 }] : have.map((pid) => ({ pid, units: 1 })), lone ? 'The only one who has — explain yourself!' : 'Guilty as charged', now);
   g.last = { have, never, lone };
+  g.stage = 'reveal'; g.deadline = now + T.reveal;
+}
+// Each pick that really said I Have makes them drink 1; each wrong pick makes the guesser drink 1.
+function nhieBlindResolve(s, now) {
+  const g = s.g;
+  const have = g.players.filter((p) => g.answers[p] === true);
+  const list = [], results = [];
+  for (const guesser of g.guessers) {
+    const picks = g.guesses[guesser];
+    if (!picks) { results.push({ guesser, picks: [], skipped: true }); continue; }
+    const marked = picks.map((pid) => ({ pid, right: have.includes(pid) }));
+    for (const m of marked) list.push({ pid: m.right ? m.pid : guesser, units: 1 });
+    results.push({ guesser, picks: marked });
+  }
+  give(s, list, 'Blind mode: caught out or guessed wrong', now);
+  g.last = { have, never: g.guessers, blind: true, results };
   g.stage = 'reveal'; g.deadline = now + T.reveal;
 }
 function nhieNext(s, now) {
@@ -306,7 +338,7 @@ function nhieNext(s, now) {
   if (g.stage !== 'reveal') return 'Nothing to advance yet';
   g.i++;
   if (g.i >= g.list.length) return void finish(s);
-  g.stage = 'ask'; g.answers = {}; g.last = null; g.deadline = now + T.ask;
+  g.stage = 'ask'; g.answers = {}; g.last = null; g.guesses = null; g.guessers = null; g.yesCount = null; g.deadline = now + T.ask;
 }
 const nhieActs = {
   nhieAnswer(s, pid, a, now) {
@@ -315,6 +347,17 @@ const nhieActs = {
     if (typeof a.have !== 'boolean') return 'Pick one';
     g.answers[pid] = a.have;
     if (g.players.every((p) => p in g.answers)) nhieReveal(s, now);
+  },
+  nhieGuess(s, pid, a, now) {
+    const g = s.g;
+    if (g.stage !== 'guess') return 'Not guessing right now';
+    if (!g.guessers.includes(pid)) return 'Only the people who said Never guess';
+    if (g.guesses[pid]) return 'You already locked in a guess';
+    const picks = a.picks;
+    if (!Array.isArray(picks) || picks.length !== g.yesCount) return `Pick exactly ${g.yesCount}`;
+    if (new Set(picks).size !== picks.length || !picks.every((p) => typeof p === 'string' && g.players.includes(p) && p !== pid)) return 'Pick other players';
+    g.guesses[pid] = [...picks];
+    if (g.guessers.every((p) => g.guesses[p])) nhieBlindResolve(s, now);
   },
 };
 
@@ -530,7 +573,11 @@ const DEADLINE = {
     else if (g.stage === 'vote') quipResolve(s, now);
     else if (g.stage === 'reveal') quipNext(s, now, rng);
   },
-  nhie(s, now) { if (s.g.stage === 'ask') nhieReveal(s, now); else if (s.g.stage === 'reveal') nhieNext(s, now); },
+  nhie(s, now) {
+    if (s.g.stage === 'ask') nhieReveal(s, now);
+    else if (s.g.stage === 'guess') nhieBlindResolve(s, now); // no guess in time: no drinks either way
+    else if (s.g.stage === 'reveal') nhieNext(s, now);
+  },
   golf(s, now) { if (s.g.stage === 'play') golfHoleEnd(s, now); else if (s.g.stage === 'holeResult') golfNext(s); },
   bus(s, now, rng) { busNext(s, now, rng); },
   wheel(s, now) { if (s.g.stage === 'spinning') wheelLand(s, now); else if (s.g.stage === 'over') finish(s); },
