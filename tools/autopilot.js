@@ -35,7 +35,11 @@ export const status = (() => {
     }
     if (g.type === 'nhie') {
       if (g.stage === 'ask' && !(me in g.answers)) return A({ type: 'nhieAnswer', have: Math.random() < 0.4 });
-      if (g.stage === 'reveal' && host) return setTimeout(() => A({ type: 'next' }), 600);
+      if (g.stage === 'guess' && g.guessers.includes(me) && !g.guesses[me]) {
+        const others = g.players.filter((p) => p !== me).sort(() => Math.random() - 0.5);
+        return A({ type: 'nhieGuess', picks: others.slice(0, g.yesCount) });
+      }
+      if (g.stage === 'reveal' && host) return setTimeout(() => A({ type: 'next' }), 1500);
     }
     if (g.type === 'golf') {
       if (g.stage === 'play' && g.turn === me && !busy) {

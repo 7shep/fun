@@ -367,6 +367,8 @@ function lobbyHtml(s) {
     <div class="panel"><h2 class="subtitle">Tonight's Game</h2>
       <div class="chips">${Object.entries(E.GAMES).map(([id, g]) => `<button class="chip ${s.game === id ? 'on' : ''}" data-do="setGame" data-id="${id}" ${host ? '' : 'disabled'}>${g.name}</button>`).join('')}</div>
       <p class="muted">${esc(G.blurb)} (${G.min}+ players)</p>
+      ${s.game === 'nhie' ? `<h2 class="subtitle">Blind mode</h2><div class="chips">${[[false, 'Off'], [true, 'On']].map(([on, label]) => `<button class="chip ${!!s.blind === on ? 'on' : ''}" data-do="setBlind" data-id="${on ? 1 : 0}" ${host ? '' : 'disabled'}>${label}</button>`).join('')}</div>
+        <p class="muted small">${s.blind ? 'Answers stay secret. Everyone who says Never guesses who said I Have: right guesses make them drink, wrong guesses make you drink.' : 'Everyone who says I Have drinks.'}</p>` : ''}
       ${s.game === 'wheel' ? `<h2 class="subtitle">Laps</h2><div class="chips">${[1, 2, 3, 4, 5].map((n) => `<button class="chip ${s.laps === n ? 'on' : ''}" data-do="setLaps" data-id="${n}" ${host ? '' : 'disabled'}>${n}</button>`).join('')}</div>` : ''}
     </div>
     <div class="panel"><h2 class="subtitle">Drinking Difficulty</h2>
@@ -477,15 +479,59 @@ function nhieHtml(s, g) {
     return `<section class="screen"><h1 class="title center">Never Have I Ever</h1>${card}${timer(g.deadline, E.T.ask)}
       ${playing ? `<div class="grid2"><button class="btn danger ${mine === true ? 'on' : ''}" data-do="nhie" data-id="1" aria-pressed="${mine === true}">I Have</button>
         <button class="btn secondary ${mine === false ? 'on' : ''}" data-do="nhie" data-id="0" aria-pressed="${mine === false}">Never</button></div>
+        ${g.blind ? '<p class="muted center small">Blind mode: nobody sees your answer. The Nevers have to guess who said I Have.</p>' : ''}
         ${mine === undefined ? '<p class="muted center">Your answer is private until everyone has answered.</p>' : `<div class="banner">You said <b>${mine ? 'I HAVE' : 'NEVER'}</b>. Waiting for ${badges(waiting)}</div>`}`
         : '<div class="banner">Spectating</div>'}
     </section>`;
   }
+  if (g.stage === 'guess') return nhieGuessHtml(s, g, card);
   const L = g.last;
+  if (L.blind) return nhieBlindRevealHtml(s, g, card, L);
   return `<section class="screen"><h1 class="title center">Never Have I Ever</h1>${card}${applause(true)}
     ${L.lone ? `<div class="bus-banner">STORY TIME! ${nm(L.lone)} must explain — 2 units</div>` : ''}
     <div class="panel"><h2 class="subtitle">I Have (${L.have.length})</h2><div class="voters">${badges(L.have)}</div></div>
     <div class="panel"><h2 class="subtitle">Never (${L.never.length})</h2><div class="voters">${badges(L.never)}</div></div>
+    ${hostBtn(g.i + 1 >= g.list.length ? 'Final results' : 'Next statement', 'next')}${waitHost('continue')}
+  </section>`;
+}
+
+function nhieGuessHtml(s, g, card) {
+  const n = g.yesCount, key = `${s.gameNo}-${g.i}`, waiting = g.guessers.filter((p) => !g.guesses[p]);
+  if (app.ui.picks?.key !== key) app.ui.picks = { key, ids: [] };
+  const picks = app.ui.picks.ids;
+  let body;
+  if (g.guessers.includes(me()) && !g.guesses[me()]) {
+    body = `<h2 class="subtitle center">Who said I Have? Pick ${n}</h2>
+      <div class="chips">${g.players.filter((p) => p !== me()).map((p) => `<button class="chip ${picks.includes(p) ? 'on' : ''}" data-do="blindPick" data-id="${esc(p)}" aria-pressed="${picks.includes(p)}">${nm(p)}</button>`).join('')}</div>
+      <p class="muted center small">Right: they drink. Wrong: you drink.</p>
+      <button class="btn primary" data-do="blindLock" ${picks.length === n ? '' : 'disabled'}>Lock in ${picks.length}/${n}</button>`;
+  } else if (g.guesses[me()]) {
+    body = `<div class="banner">You guessed ${g.guesses[me()].map(nm).join(', ')}. Waiting for ${badges(waiting)}</div>`;
+  } else if (g.answers[me()] === true) {
+    body = `<div class="banner">You said <b>I HAVE</b>. Act natural… Waiting for ${badges(waiting)}</div>`;
+  } else body = `<div class="banner">Waiting for ${badges(waiting)}</div>`;
+  return `<section class="screen"><h1 class="title center">Never Have I Ever</h1>${card}${timer(g.deadline, E.T.guess)}
+    <div class="bus-banner">${n} ${n === 1 ? 'person' : 'people'} said I HAVE</div>
+    <div class="panel"><h2 class="subtitle">Playing</h2><div class="voters">${badges(g.players)}</div></div>
+    ${body}
+  </section>`;
+}
+function nhieBlindRevealHtml(s, g, card, L) {
+  const round = {};
+  for (const r of L.results) for (const m of r.picks) { const p = m.right ? m.pid : r.guesser; round[p] = (round[p] ?? 0) + 1; }
+  const total = Object.fromEntries(g.players.map((p) => [p, 0]));
+  for (const d of s.drinks) if (d.gn === s.gameNo && d.pid in total) total[d.pid] += d.units;
+  const rows = [...g.players].sort((a, b) => total[b] - total[a]);
+  const lines = L.results.map((r) => `<div>${nm(r.guesser)}: ${r.skipped ? '<span class="muted">no guess in time</span>'
+    : r.picks.map((m) => `<span class="badge ${m.right ? '' : 'off'}">${nm(m.pid)} ${m.right ? '✓' : '✗'}</span>`).join(' ')}</div>`).join('');
+  return `<section class="screen"><h1 class="title center">Never Have I Ever</h1>${card}${applause(true)}
+    <div class="panel"><h2 class="subtitle">I Have (${L.have.length})</h2><div class="voters">${badges(L.have)}</div></div>
+    <div class="panel"><h2 class="subtitle">Never (${L.never.length})</h2><div class="voters">${badges(L.never)}</div></div>
+    ${L.results.length ? `<div class="panel"><h2 class="subtitle">The guesses</h2><div class="stack">${lines}</div>
+      <p class="muted small">${Object.keys(round).length ? `This round: ${Object.entries(round).map(([p, u]) => `${nm(p)} ${plural(u, 'unit')}`).join(' · ')}` : 'Nobody drinks this round.'}</p></div>`
+      : `<div class="banner">${L.have.length ? 'Everyone has. Nobody left to guess!' : 'Nobody has. Saints, all of you.'}</div>`}
+    <table class="board"><tr><th>Player</th><th class="num">Units this game</th></tr>
+      ${rows.map((p) => `<tr class="${p === me() ? 'me' : ''}"><td>${nm(p)}</td><td class="num">${total[p]}</td></tr>`).join('')}</table>
     ${hostBtn(g.i + 1 >= g.list.length ? 'Final results' : 'Next statement', 'next')}${waitHost('continue')}
   </section>`;
 }
@@ -833,6 +879,14 @@ const DO = {
   closeCelebrate: () => $('#celebrate').classList.remove('show'),
   setGame: (el) => act({ type: 'setGame', game: el.dataset.id }),
   setLaps: (el) => act({ type: 'setLaps', laps: Number(el.dataset.id) }),
+  setBlind: (el) => act({ type: 'setBlind', on: el.dataset.id === '1' }),
+  blindPick: (el) => {
+    const n = app.state.g.yesCount, ids = app.ui.picks.ids, p = el.dataset.id;
+    if (ids.includes(p)) ids.splice(ids.indexOf(p), 1);
+    else { if (ids.length >= n) ids.shift(); ids.push(p); } // at the limit, the oldest pick makes room
+    render();
+  },
+  blindLock: () => act({ type: 'nhieGuess', picks: [...app.ui.picks.ids] }),
   setDifficulty: (el) => act({ type: 'setDifficulty', level: el.dataset.id }),
   kick: (el) => { if (confirm(`Remove ${E.nameOf(app.state, el.dataset.id)} from the room?`)) act({ type: 'kick', target: el.dataset.id }); },
   promptKind: (el) => { app.ui.promptKind = el.dataset.id; render(); },
