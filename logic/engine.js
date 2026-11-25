@@ -144,14 +144,18 @@ function handle(s, pid, a, now, rng) {
       s.terms.signed[pid] = true;
       return;
     case 'startGame': {
-      if (s.phase !== 'terms') return 'Sign the contract first';
-      const waiting = s.players.filter((p) => !s.terms.signed[p.id]).map((p) => p.name);
-      if (waiting.length) return `Still waiting on ${waiting.join(', ')}`;
-      if (s.players.length < GAMES[s.game].min) return `Not enough players`;
+      // skip: the host can skip the contract from the lobby, or stop waiting on signatures
+      if (s.phase !== 'terms' && !(a.skip === true && lobby)) return 'Sign the contract first';
+      if (s.phase === 'terms' && a.skip !== true) {
+        const waiting = s.players.filter((p) => !s.terms.signed[p.id]).map((p) => p.name);
+        if (waiting.length) return `Still waiting on ${waiting.join(', ')}`;
+      }
+      const game = s.phase === 'terms' ? s.terms.game : s.game;
+      if (s.players.length < GAMES[game].min) return `${GAMES[game].name} needs at least ${GAMES[game].min} players`;
       s.gameNo++;
       s.phase = 'game';
       s.results = null;
-      s.g = START[s.terms.game](s, now, rng);
+      s.g = START[game](s, now, rng);
       s.terms = null;
       return;
     }

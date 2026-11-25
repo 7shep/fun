@@ -373,6 +373,7 @@ function lobbyHtml(s) {
       <div class="chips">${LEVELS.map((l) => `<button class="chip ${s.difficulty === l.id ? 'on' : ''}" data-do="setDifficulty" data-id="${l.id}" ${host ? '' : 'disabled'}>${l.name}</button>`).join('')}</div>
       <p class="muted">1 unit = ${esc(lvl.per)}${shotRule}</p></div>
     ${host ? `<button class="btn primary" data-do="openTerms" ${s.players.length < G.min ? 'disabled' : ''}>Sign the Contract →</button>
+      <button class="btn ghost" data-do="skipTerms" ${s.players.length < G.min ? 'disabled' : ''}>Skip the contract, just play</button>
       ${s.players.length < G.min ? `<p class="muted center">Need ${G.min - s.players.length} more player(s).</p>` : ''}` : waitHost('pick a game')}
     <div class="panel"><h2 class="subtitle">Write Your Own</h2>
       <div class="chips"><button class="chip ${app.ui.promptKind === 'quip' ? 'on' : ''}" data-do="promptKind" data-id="quip">Quip prompt</button>
@@ -403,6 +404,7 @@ function termsHtml(s) {
       <div class="signatures">${done.map((p) => `<div>${esc(p.name)}</div>`).join('') || '<span class="muted">No signatures yet</span>'}</div>
       ${waiting.length ? `<p class="muted">Waiting on: ${waiting.map((p) => esc(p.name)).join(', ')}</p>` : ''}</div>
     ${amHost() ? `<button class="btn secondary" data-do="startGame" ${waiting.length ? 'disabled' : ''}>Start ${esc(E.GAMES[s.terms.game].name)}</button>
+      ${waiting.length ? '<button class="btn ghost" data-do="skipTerms">Skip the signatures and start</button>' : ''}
       <button class="btn ghost small" data-do="toLobby">Back to lobby</button>` : waitHost('start the game')}
   </section>`;
 }
@@ -845,6 +847,7 @@ const DO = {
   waive: (el) => { app.ui.waived = el.checked ? `${app.state.code}-${app.state.gameNo + 1}` : null; render(); },
   sign: () => act({ type: 'sign' }),
   startGame: () => act({ type: 'startGame' }),
+  skipTerms: () => act({ type: 'startGame', skip: true }),
   toLobby: () => act({ type: 'toLobby' }),
   next: () => act({ type: 'next' }),
   skipTurn: () => act({ type: 'skipTurn' }),

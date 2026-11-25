@@ -225,3 +225,26 @@ test('failover: only the first present non-host player claims, and only after th
   assert.equal(E.shouldTakeOver(r.s, 'p3', new Set(), late), false); // a phone that sees nobody (offline) stays put
   assert.equal(E.shouldTakeOver(null, 'p1', all, late), false);
 });
+
+test('the host can skip the contract from the lobby or stop waiting on signatures', () => {
+  const r = room(3);
+  r.do('p0', { type: 'setGame', game: 'nhie' });
+  assert.match(r.try('p1', { type: 'startGame', skip: true }).error, /host/);
+  assert.match(r.try('p0', { type: 'startGame' }).error, /contract/); // no skip, no contract
+  r.do('p0', { type: 'startGame', skip: true });
+  assert.equal(r.s.phase, 'game');
+  assert.equal(r.s.g.type, 'nhie');
+
+  const t = room(3);
+  t.do('p0', { type: 'setGame', game: 'wheel' });
+  t.do('p0', { type: 'openTerms' });
+  t.do('p1', { type: 'sign' });
+  assert.match(t.try('p0', { type: 'startGame' }).error, /waiting/i);
+  t.do('p0', { type: 'startGame', skip: true }); // p0 and p2 never signed
+  assert.equal(t.s.g.type, 'wheel');
+  assert.equal(t.s.terms, null);
+
+  const q = room(2);
+  q.do('p0', { type: 'setGame', game: 'quip' });
+  assert.match(q.try('p0', { type: 'startGame', skip: true }).error, /at least 3/); // the player minimum still holds
+});
