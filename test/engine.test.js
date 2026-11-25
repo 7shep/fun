@@ -70,6 +70,10 @@ test('quip shots plays 2 rounds; custom prompts never go to their author', () =>
       r.do('p0', { type: 'next' });
     }
   }
+  assert.equal(r.s.g.stage, 'finalAnswer'); // then the Last Call Round
+  r.wait(E.T.answer); // nobody answers: all chicken out, nobody to vote for
+  assert.equal(r.s.g.stage, 'finalReveal');
+  r.do('p0', { type: 'next' });
   checkTally(r.s);
 });
 
@@ -317,4 +321,45 @@ test('each player drinks at their own level', () => {
   assert.equal(d1.level, 'alcoholism');
   assert.notEqual(d0.text, d1.text);
   assert.equal(r.s.players.find((p) => p.id === 'p0').level, 'tipsy');
+});
+
+test('quip Last Call Round: everyone answers one prompt, up to 3 votes each, no self-votes, tripled stakes', () => {
+  const r = room(5);
+  r.start('quip');
+  for (let round = 1; round <= 2; round++) {
+    for (const p of r.ids) r.do(p, { type: 'quipAnswer', answers: { 0: 'x', 1: 'y', 2: 'z', 3: 'w', 4: 'v' } });
+    while (r.s.g.stage !== 'answer' && r.s.g.round === round && r.s.phase === 'game' && r.s.g.stage !== 'finalAnswer') {
+      if (r.s.g.stage === 'vote') for (const v of E.quipVoters(r.s.g)) r.do(v, { type: 'quipVote', choice: 'a' });
+      if (r.s.g.stage === 'reveal') r.do('p0', { type: 'next' });
+    }
+  }
+  const g = r.s.g;
+  assert.equal(g.stage, 'finalAnswer');
+  assert.equal(g.round, 3);
+  assert.ok(g.final.prompt.text.includes('___'));
+  const before = { ...g.points }, drank = r.s.drinks.length;
+  for (const p of ['p0', 'p1', 'p2', 'p3']) r.do(p, { type: 'quipFinalAnswer', text: 'answer ' + p });
+  r.wait(E.T.answer); // p4 never answers: chickens out
+  assert.equal(r.s.g.stage, 'finalVote');
+  assert.equal(r.s.g.final.answers.p4, E.CHICKEN);
+  assert.equal(r.s.g.final.order.length, 5);
+  assert.match(r.try('p0', { type: 'quipFinalVote', picks: ['p0'] }).error, /other/); // own answer
+  assert.match(r.try('p0', { type: 'quipFinalVote', picks: ['p4'] }).error, /other/); // chicken
+  assert.match(r.try('p0', { type: 'quipFinalVote', picks: ['p1', 'p2', 'p3', 'p1'] }).error, /1 to 3/);
+  assert.match(r.try('p0', { type: 'quipFinalVote', picks: ['p1', 'p1'] }).error, /other/);
+  r.do('p0', { type: 'quipFinalVote', picks: ['p1', 'p2', 'p3'] });
+  assert.match(r.try('p0', { type: 'quipFinalVote', picks: ['p1'] }).error, /already/);
+  r.do('p1', { type: 'quipFinalVote', picks: ['p2', 'p3'] });
+  r.do('p2', { type: 'quipFinalVote', picks: ['p3'] });
+  r.do('p3', { type: 'quipFinalVote', picks: ['p2'] });
+  assert.equal(r.s.g.stage, 'finalVote'); // p4 can still vote even after chickening
+  r.do('p4', { type: 'quipFinalVote', picks: ['p2', 'p3'] });
+  const L = r.s.g.last;
+  assert.equal(r.s.g.stage, 'finalReveal');
+  assert.deepEqual(L.got, { p0: 0, p1: 1, p2: 4, p3: 4, p4: 0 });
+  assert.deepEqual(L.drinks, { p0: 3, p1: 2, p2: 0, p3: 0, p4: 3 });
+  assert.equal(r.s.g.points.p2 - before.p2, 1200);
+  assert.equal(r.s.drinks.length - drank, 3);
+  r.do('p0', { type: 'next' });
+  checkTally(r.s);
 });

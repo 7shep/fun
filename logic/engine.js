@@ -11,7 +11,7 @@ export const GAMES = {
   bus: { name: 'Ride the Bus', min: 2, blurb: 'Guess the cards. The worst guesser rides the bus.' },
   wheel: { name: 'Wheel of Misfortune', min: 2, blurb: 'Spin the wheel and accept your fate.' },
 };
-export const T = { answer: 60000, vote: 30000, ask: 20000, guess: 30000, reveal: 25000, spin: 5000, intro: 8000, over: 4000 };
+export const T = { answer: 60000, vote: 30000, ask: 20000, guess: 30000, finalVote: 40000, reveal: 25000, spin: 5000, intro: 8000, over: 4000 };
 export const MAX_PLAYERS = 12;
 export const NHIE_COUNT = 20;
 export const CHICKEN = '[chickened out]';
@@ -266,11 +266,47 @@ function quipResolve(s, now) {
 }
 function quipNext(s, now, rng) {
   const g = s.g;
+  if (g.stage === 'finalReveal') return void finish(s);
   if (g.stage !== 'reveal') return 'Nothing to advance yet';
   g.mi++; g.last = null;
   if (g.mi < g.matchups.length) { g.stage = 'vote'; g.votes = {}; g.deadline = now + T.vote; }
   else if (g.round === 1) { g.round = 2; quipRound(g, now, rng); }
-  else finish(s);
+  else quipFinalStart(g, now);
+}
+
+/* Last Call Round: everyone answers the same prompt, then everyone gives up to 3 votes to other answers. */
+export const FINAL_VOTES = 3;
+const finalTargets = (g, pid) => g.players.filter((p) => p !== pid && g.final.answers[p] !== CHICKEN);
+export const quipFinalVoters = (g) => g.players.filter((p) => finalTargets(g, p).length > 0);
+function quipFinalStart(g, now) {
+  const prompt = g.deck.shift() ?? { text: 'The real reason this party is ending: ___' };
+  g.round = 3; g.stage = 'finalAnswer'; g.submitted = {}; g.last = null; g.mi = 0;
+  g.final = { prompt, answers: {}, votes: {}, order: [] };
+  g.deadline = now + T.answer;
+}
+function quipFinalClose(s, now, rng) {
+  const g = s.g;
+  for (const p of g.players) if (!g.final.answers[p]) { g.final.answers[p] = CHICKEN; g.chickens[p]++; }
+  g.final.order = R.shuffle(g.players, rng); // answers show anonymously, in a random order
+  g.stage = 'finalVote'; g.final.votes = {}; g.deadline = now + T.finalVote;
+  if (!quipFinalVoters(g).length) quipFinalResolve(s, now);
+}
+// Votes are worth 300 points each. No votes (or no answer) drinks 3; the fewest votes above zero drinks 2; if everyone ties, 1 each.
+function quipFinalResolve(s, now) {
+  const g = s.g, f = g.final, got = zeros(g.players);
+  for (const picks of Object.values(f.votes)) for (const p of picks) got[p]++;
+  for (const p of g.players) g.points[p] += got[p] * 300;
+  const voted = g.players.filter((p) => f.answers[p] !== CHICKEN && got[p] > 0);
+  const counts = voted.map((p) => got[p]), low = Math.min(...counts);
+  const allTied = voted.length === g.players.length && counts.every((c) => c === low);
+  const drinks = Object.fromEntries(g.players.map((p) => {
+    if (f.answers[p] === CHICKEN || got[p] === 0) return [p, 3];
+    if (allTied) return [p, 1];
+    return [p, got[p] === low ? 2 : 0];
+  }));
+  give(s, g.players.map((pid) => ({ pid, units: drinks[pid] })), 'Last Call Round', now);
+  g.last = { got, drinks };
+  g.stage = 'finalReveal'; g.deadline = now + T.reveal;
 }
 const quipActs = {
   quipAnswer(s, pid, a, now) {
@@ -293,6 +329,25 @@ const quipActs = {
     if (a.choice !== 'a' && a.choice !== 'b') return 'Pick an answer';
     g.votes[pid] = a.choice;
     if (quipVoters(g).every((p) => g.votes[p])) quipResolve(s, now);
+  },
+  quipFinalAnswer(s, pid, a, now, rng) {
+    const g = s.g;
+    if (g.stage !== 'finalAnswer') return 'Time is up';
+    if (g.submitted[pid]) return;
+    g.final.answers[pid] = clean(a.text, 80) || null;
+    g.submitted[pid] = true;
+    if (g.players.every((p) => g.submitted[p])) quipFinalClose(s, now, rng);
+  },
+  quipFinalVote(s, pid, a, now) {
+    const g = s.g;
+    if (g.stage !== 'finalVote') return 'Voting is closed';
+    if (!quipFinalVoters(g).includes(pid)) return 'Nothing for you to vote on';
+    if (g.final.votes[pid]) return 'You already voted';
+    const targets = finalTargets(g, pid), max = Math.min(FINAL_VOTES, targets.length), picks = a.picks;
+    if (!Array.isArray(picks) || picks.length < 1 || picks.length > max) return `Pick 1 to ${max} answers`;
+    if (new Set(picks).size !== picks.length || !picks.every((p) => targets.includes(p))) return 'Pick other answers';
+    g.final.votes[pid] = [...picks];
+    if (quipFinalVoters(g).every((p) => g.final.votes[p])) quipFinalResolve(s, now);
   },
 };
 
@@ -578,7 +633,9 @@ const DEADLINE = {
     const g = s.g;
     if (g.stage === 'answer') quipClose(g, now);
     else if (g.stage === 'vote') quipResolve(s, now);
-    else if (g.stage === 'reveal') quipNext(s, now, rng);
+    else if (g.stage === 'reveal' || g.stage === 'finalReveal') quipNext(s, now, rng);
+    else if (g.stage === 'finalAnswer') quipFinalClose(s, now, rng);
+    else if (g.stage === 'finalVote') quipFinalResolve(s, now);
   },
   nhie(s, now) {
     if (s.g.stage === 'ask') nhieReveal(s, now);
