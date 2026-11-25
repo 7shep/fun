@@ -377,8 +377,8 @@ function lobbyHtml(s) {
     <div class="panel"><h2 class="subtitle">Write Your Own</h2>
       <div class="chips"><button class="chip ${app.ui.promptKind === 'quip' ? 'on' : ''}" data-do="promptKind" data-id="quip">Quip prompt</button>
         <button class="chip ${app.ui.promptKind === 'nhie' ? 'on' : ''}" data-do="promptKind" data-id="nhie">Never Have I Ever</button></div>
-      <input id="custom-text" class="field" maxlength="110" placeholder="${app.ui.promptKind === 'quip' ? 'e.g. The worst name for a cocktail: ___' : 'e.g. …fallen asleep at a party'}">
-      <button class="btn secondary small" data-do="addPrompt">Add to the deck</button>
+      <form class="stack" data-form="prompt"><input id="custom-text" class="field" maxlength="110" enterkeyhint="done" placeholder="${app.ui.promptKind === 'quip' ? 'e.g. The worst name for a cocktail: ___' : 'e.g. …fallen asleep at a party'}">
+      <button class="btn secondary small" type="submit">Add to the deck</button></form>
       <p class="muted small">Room deck: ${plural(count('quip'), 'custom prompt')} · ${plural(count('nhie'), 'custom confession')}. This session only.</p>
       ${mine.length ? `<ul class="small">${mine.map((c) => `<li>${c.kind === 'quip' ? 'Quip' : 'NHIE'}: ${esc(c.text)}</li>`).join('')}</ul>` : ''}</div>
     <div class="row"><button class="btn ghost small" data-do="summary">Session summary</button><span class="spacer"></span><button class="btn ghost small" data-do="leave">Leave room</button></div>
@@ -877,6 +877,7 @@ document.addEventListener('submit', (ev) => {
   const kind = ev.target.dataset.form, name = $('#f-name')?.value;
   if (kind === 'create') createRoom(name);
   if (kind === 'join') joinRoom($('#f-code')?.value, name);
+  if (kind === 'prompt') DO.addPrompt(); // the phone keyboard's Go/Enter adds it too
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && app.net && app.state && !amHost()) hello(); });
 
